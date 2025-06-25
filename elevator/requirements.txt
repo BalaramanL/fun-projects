@@ -1,0 +1,6 @@
+# Elevator Emulator Requirements
+# Python 3.8+ is recommended
+
+# Core dependencies
+asyncio>=3.4.3
+# tkinter is part of the Python standard library and doesn't need to be installed via pip

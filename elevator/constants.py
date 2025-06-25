@@ -1,0 +1,21 @@
+"""
+Constants for the elevator system.
+"""
+
+# Time constants (in seconds)
+DOOR_OPENING_TIME = 1
+DOOR_OPEN_TIME = 2
+DOOR_CLOSING_TIME = 1
+FLOOR_TRANSIT_TIME = 2
+MAINTENANCE_PERIOD = 30
+
+# Capacity constants
+CAPACITY_PER_ELEVATOR = 10
+
+# Cost constants
+FLOOR_TRANSIT_COST = 1
+MAXIMUM_COST_UNTIL_MAINTENANCE = 100
+
+# System constants
+DEFAULT_TOTAL_FLOORS = 20
+DEFAULT_NUM_ELEVATORS = 2
