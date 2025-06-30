@@ -1,0 +1,194 @@
+{% extends "reports/base.html" %}
+
+{% block title %}Order Report - BlinkIt WMS{% endblock %}
+
+{% block report_title %}{{ data.title }}{% endblock %}
+
+{% block generated_at %}{{ data.generated_at }}{% endblock %}
+
+{% block report_period %}
+    {% if data.period %}
+        {{ data.period.start_date }} to {{ data.period.end_date }}
+    {% else %}
+        All Time
+    {% endif %}
+{% endblock %}
+
+{% block report_filters %}
+    {% if data.filters %}
+        <p><strong>Filters:</strong>
+            {% if data.filters.warehouse_id %} Warehouse: {{ data.filters.warehouse_id }}{% endif %}
+            {% if data.filters.status %} Status: {{ data.filters.status }}{% endif %}
+            {% if data.filters.customer_id %} Customer: {{ data.filters.customer_id }}{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Summary Statistics -->
+    <div class="report-section">
+        <h2>Summary</h2>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <h3>Total Orders</h3>
+                <div class="stat-value">{{ data.summary.total_orders }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Revenue</h3>
+                <div class="stat-value">₹{{ data.summary.total_revenue|round(2) }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Average Order Value</h3>
+                <div class="stat-value">₹{{ data.summary.avg_order_value|round(2) }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Orders Per Day</h3>
+                <div class="stat-value">{{ data.summary.orders_per_day|round(1) }}</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if data.generate_charts %}
+    <!-- Charts -->
+    <div class="report-section">
+        <h2>Visualizations</h2>
+        {% if data.charts.orders_over_time %}
+        <div class="chart-container">
+            <img src="{{ data.charts.orders_over_time }}" alt="Orders Over Time" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        {% if data.charts.category_distribution %}
+        <div class="chart-container">
+            <img src="{{ data.charts.category_distribution }}" alt="Category Distribution" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        {% if data.charts.status_distribution %}
+        <div class="chart-container">
+            <img src="{{ data.charts.status_distribution }}" alt="Order Status Distribution" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Order Status Breakdown -->
+    <div class="report-section">
+        <h2>Order Status Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                    <th>Total Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for status in data.status_breakdown %}
+                <tr>
+                    <td>{{ status.status }}</td>
+                    <td>{{ status.count }}</td>
+                    <td>{{ status.percentage|round(1) }}%</td>
+                    <td>₹{{ status.total_value|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Time Analysis -->
+    {% if data.time_analysis %}
+    <div class="report-section">
+        <h2>Time Analysis</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time Period</th>
+                    <th>Orders</th>
+                    <th>Revenue</th>
+                    <th>Avg. Order Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for period in data.time_analysis %}
+                <tr>
+                    <td>{{ period.period }}</td>
+                    <td>{{ period.orders }}</td>
+                    <td>₹{{ period.revenue|round(2) }}</td>
+                    <td>₹{{ period.avg_value|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Top Products -->
+    {% if data.top_products %}
+    <div class="report-section">
+        <h2>Top Products</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Units Sold</th>
+                    <th>Revenue</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in data.top_products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.category }}</td>
+                    <td>{{ product.units_sold }}</td>
+                    <td>₹{{ product.revenue|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Recent Orders -->
+    <div class="report-section">
+        <h2>Order Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Warehouse</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in data.items %}
+                <tr>
+                    <td>{{ order.order_id }}</td>
+                    <td>{{ order.order_date }}</td>
+                    <td>{{ order.customer_name }}</td>
+                    <td>{{ order.warehouse_name }}</td>
+                    <td>{{ order.item_count }}</td>
+                    <td>₹{{ order.total_amount|round(2) }}</td>
+                    <td>{{ order.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if data.insights %}
+    <!-- Insights -->
+    <div class="report-section">
+        <h2>Insights</h2>
+        <ul>
+            {% for insight in data.insights %}
+            <li>{{ insight }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+{% endblock %}

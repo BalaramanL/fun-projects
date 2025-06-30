@@ -1,0 +1,179 @@
+{% extends "reports/base.html" %}
+
+{% block title %}Delivery Report - BlinkIt WMS{% endblock %}
+
+{% block report_title %}{{ data.title }}{% endblock %}
+
+{% block generated_at %}{{ data.generated_at }}{% endblock %}
+
+{% block report_period %}
+    {% if data.period %}
+        {{ data.period.start_date }} to {{ data.period.end_date }}
+    {% else %}
+        All Time
+    {% endif %}
+{% endblock %}
+
+{% block report_filters %}
+    {% if data.filters %}
+        <p><strong>Filters:</strong>
+            {% if data.filters.warehouse_id %} Warehouse: {{ data.filters.warehouse_id }}{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Summary Statistics -->
+    <div class="report-section">
+        <h2>Performance Summary</h2>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <h3>Total Deliveries</h3>
+                <div class="stat-value">{{ data.performance.total_deliveries }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Completed Deliveries</h3>
+                <div class="stat-value">{{ data.performance.completed_deliveries }}</div>
+                <div>{{ (data.performance.completion_rate * 100)|round(1) }}%</div>
+            </div>
+            <div class="stat-card {% if data.performance.on_time_rate < 0.9 %}warning{% else %}success{% endif %}">
+                <h3>On-Time Rate</h3>
+                <div class="stat-value">{{ (data.performance.on_time_rate * 100)|round(1) }}%</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg. Delivery Time</h3>
+                <div class="stat-value">{{ data.performance.average_delivery_time|round(1) }} min</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if data.generate_charts %}
+    <!-- Charts -->
+    <div class="report-section">
+        <h2>Visualizations</h2>
+        {% if data.time_series_data %}
+        <div class="chart-container">
+            <h3>On-Time Delivery Rate Over Time</h3>
+            <img src="{{ data.charts.on_time_rate }}" alt="On-Time Rate Over Time" style="max-width: 100%;">
+        </div>
+        <div class="chart-container">
+            <h3>Average Delivery Time Over Time</h3>
+            <img src="{{ data.charts.average_delivery_time }}" alt="Average Delivery Time" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        {% if data.pie_data %}
+        <div class="chart-container">
+            <h3>Delivery Status Distribution</h3>
+            <img src="{{ data.charts.status_distribution }}" alt="Status Distribution" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Daily Metrics -->
+    {% if data.daily_metrics %}
+    <div class="report-section">
+        <h2>Daily Performance</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Total Deliveries</th>
+                    <th>Completed</th>
+                    <th>On-Time Rate</th>
+                    <th>Avg. Time (min)</th>
+                    <th>Avg. Distance (km)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for date, metrics in data.daily_metrics.items() %}
+                <tr>
+                    <td>{{ date }}</td>
+                    <td>{{ metrics.total_deliveries }}</td>
+                    <td>{{ metrics.completed_deliveries }}</td>
+                    <td>{{ (metrics.on_time_rate * 100)|round(1) }}%</td>
+                    <td>{{ metrics.average_delivery_time|round(1) }}</td>
+                    <td>{{ metrics.average_distance|round(1) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Agent Performance -->
+    {% if data.agent_performance %}
+    <div class="report-section">
+        <h2>Agent Performance</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th>Total Deliveries</th>
+                    <th>Completed</th>
+                    <th>Completion Rate</th>
+                    <th>On-Time Rate</th>
+                    <th>Avg. Time (min)</th>
+                    <th>Avg. Distance (km)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for agent_id, agent in data.agent_performance.items() %}
+                <tr>
+                    <td>{{ agent.agent_name }}</td>
+                    <td>{{ agent.total_deliveries }}</td>
+                    <td>{{ agent.completed_deliveries }}</td>
+                    <td>{{ (agent.completion_rate * 100)|round(1) }}%</td>
+                    <td>{{ (agent.on_time_rate * 100)|round(1) }}%</td>
+                    <td>{{ agent.average_delivery_time|round(1) }}</td>
+                    <td>{{ agent.average_distance|round(1) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Recent Deliveries -->
+    <div class="report-section">
+        <h2>Delivery Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Delivery ID</th>
+                    <th>Order ID</th>
+                    <th>Agent</th>
+                    <th>Customer</th>
+                    <th>Dispatch Time</th>
+                    <th>Delivery Time</th>
+                    <th>Distance (km)</th>
+                    <th>Status</th>
+                    <th>On Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for delivery in data.items %}
+                <tr>
+                    <td>{{ delivery.delivery_id }}</td>
+                    <td>{{ delivery.order_id }}</td>
+                    <td>{{ delivery.agent_name }}</td>
+                    <td>{{ delivery.customer_name }}</td>
+                    <td>{{ delivery.dispatch_time }}</td>
+                    <td>{{ delivery.actual_delivery_time or '-' }}</td>
+                    <td>{{ delivery.distance_km|round(1) }}</td>
+                    <td>{{ delivery.status }}</td>
+                    <td>
+                        {% if delivery.on_time == true %}
+                            <span style="color: var(--secondary-color);">✓</span>
+                        {% elif delivery.on_time == false %}
+                            <span style="color: var(--accent-color);">✗</span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

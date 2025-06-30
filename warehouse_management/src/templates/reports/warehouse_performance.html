@@ -1,0 +1,200 @@
+{% extends "reports/base.html" %}
+
+{% block title %}Warehouse Performance Report - BlinkIt WMS{% endblock %}
+
+{% block report_title %}{{ data.title }}{% endblock %}
+
+{% block generated_at %}{{ data.generated_at }}{% endblock %}
+
+{% block report_period %}
+    {% if data.period %}
+        {{ data.period.start_date }} to {{ data.period.end_date }}
+    {% else %}
+        Current Snapshot
+    {% endif %}
+{% endblock %}
+
+{% block report_filters %}
+    {% if data.filters %}
+        <p><strong>Filters:</strong>
+            {% if data.filters.warehouse_id %} Warehouse: {{ data.filters.warehouse_id }}{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Warehouse Information -->
+    <div class="report-section">
+        <h2>Warehouse Information</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Capacity</th>
+                    <th>Operating Hours</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for warehouse in data.warehouses %}
+                <tr>
+                    <td>{{ warehouse.name }}</td>
+                    <td>{{ warehouse.city }}, {{ warehouse.state }}</td>
+                    <td>{{ warehouse.capacity }}</td>
+                    <td>{{ warehouse.operating_hours }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Efficiency Metrics -->
+    <div class="report-section">
+        <h2>Efficiency Metrics</h2>
+        <div class="summary-stats">
+            {% for warehouse_id, metrics in data.efficiency_metrics.items() %}
+            <div class="stat-card">
+                <h3>{{ metrics.name }}</h3>
+                <div class="stat-value">{{ metrics.orders_per_day|round(1) }}</div>
+                <div>Orders/Day</div>
+            </div>
+            <div class="stat-card">
+                <h3>{{ metrics.name }}</h3>
+                <div class="stat-value">{{ metrics.items_per_order|round(1) }}</div>
+                <div>Items/Order</div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Warehouse</th>
+                    <th>Total Orders</th>
+                    <th>Total Items</th>
+                    <th>Total Value</th>
+                    <th>Orders/Day</th>
+                    <th>Items/Order</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for warehouse_id, metrics in data.efficiency_metrics.items() %}
+                <tr>
+                    <td>{{ metrics.name }}</td>
+                    <td>{{ metrics.total_orders }}</td>
+                    <td>{{ metrics.total_items }}</td>
+                    <td>₹{{ metrics.total_value|round(2) }}</td>
+                    <td>{{ metrics.orders_per_day|round(1) }}</td>
+                    <td>{{ metrics.items_per_order|round(1) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if data.generate_charts %}
+    <!-- Charts -->
+    <div class="report-section">
+        <h2>Visualizations</h2>
+        {% if data.time_series_data %}
+        <div class="chart-container">
+            <h3>Orders Per Day</h3>
+            <img src="{{ data.charts.orders_per_day }}" alt="Orders Per Day" style="max-width: 100%;">
+        </div>
+        <div class="chart-container">
+            <h3>Items Per Day</h3>
+            <img src="{{ data.charts.items_per_day }}" alt="Items Per Day" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        {% if data.pie_data %}
+        <div class="chart-container">
+            <h3>Order Distribution by Warehouse</h3>
+            <img src="{{ data.charts.order_distribution }}" alt="Order Distribution" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Daily Metrics -->
+    {% if data.daily_metrics %}
+    <div class="report-section">
+        <h2>Daily Performance</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Orders</th>
+                    <th>Items</th>
+                    <th>Total Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for date, metrics in data.daily_metrics.items() %}
+                <tr>
+                    <td>{{ date }}</td>
+                    <td>{{ metrics.order_count }}</td>
+                    <td>{{ metrics.item_count }}</td>
+                    <td>₹{{ metrics.total_value|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Capacity Metrics -->
+    {% if data.capacity_metrics %}
+    <div class="report-section">
+        <h2>Capacity Utilization</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Warehouse</th>
+                    <th>Total Capacity</th>
+                    <th>Current Stock</th>
+                    <th>Available Capacity</th>
+                    <th>Utilization</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for warehouse_id, metrics in data.capacity_metrics.items() %}
+                <tr>
+                    <td>{{ metrics.name }}</td>
+                    <td>{{ metrics.total_capacity }}</td>
+                    <td>{{ metrics.current_stock }}</td>
+                    <td>{{ metrics.available_capacity }}</td>
+                    <td>{{ metrics.utilization_percent|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Category Breakdown -->
+    {% if data.category_breakdown %}
+    <div class="report-section">
+        <h2>Category Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Warehouse</th>
+                    <th>Category</th>
+                    <th>Stock Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for warehouse_id, categories in data.category_breakdown.items() %}
+                    {% for category, count in categories.items() %}
+                    <tr>
+                        <td>{{ data.warehouses|selectattr('id', 'equalto', warehouse_id)|map(attribute='name')|first }}</td>
+                        <td>{{ category }}</td>
+                        <td>{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+{% endblock %}

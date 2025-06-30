@@ -1,0 +1,110 @@
+{% extends "reports/base.html" %}
+
+{% block title %}Inventory Report - BlinkIt WMS{% endblock %}
+
+{% block report_title %}{{ data.title }}{% endblock %}
+
+{% block generated_at %}{{ data.generated_at }}{% endblock %}
+
+{% block report_period %}
+    {% if data.period %}
+        {{ data.period.start_date }} to {{ data.period.end_date }}
+    {% else %}
+        Current Snapshot
+    {% endif %}
+{% endblock %}
+
+{% block report_filters %}
+    {% if data.filters %}
+        <p><strong>Filters:</strong>
+            {% if data.filters.warehouse_id %} Warehouse: {{ data.filters.warehouse_id }}{% endif %}
+            {% if data.filters.category %} Category: {{ data.filters.category }}{% endif %}
+            {% if data.filters.threshold %} Low Stock Threshold: {{ data.filters.threshold }}%{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Summary Statistics -->
+    <div class="report-section">
+        <h2>Summary</h2>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <h3>Total Products</h3>
+                <div class="stat-value">{{ data.summary.total_products }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Stock Value</h3>
+                <div class="stat-value">₹{{ data.summary.total_value|round(2) }}</div>
+            </div>
+            <div class="stat-card {% if data.summary.low_stock_count > 0 %}warning{% endif %}">
+                <h3>Low Stock Items</h3>
+                <div class="stat-value">{{ data.summary.low_stock_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg. Stock Level</h3>
+                <div class="stat-value">{{ data.summary.avg_stock_level|round(1) }}%</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if data.generate_charts %}
+    <!-- Charts -->
+    <div class="report-section">
+        <h2>Visualizations</h2>
+        <div class="chart-container">
+            <img src="{{ data.charts.category_distribution }}" alt="Category Distribution" style="max-width: 100%;">
+        </div>
+        {% if data.charts.stock_levels %}
+        <div class="chart-container">
+            <img src="{{ data.charts.stock_levels }}" alt="Stock Levels" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Inventory Items -->
+    <div class="report-section">
+        <h2>Inventory Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Warehouse</th>
+                    <th>Current Stock</th>
+                    <th>Min Threshold</th>
+                    <th>Stock Level</th>
+                    <th>Unit Price</th>
+                    <th>Total Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.items %}
+                <tr {% if item.stock_level < 20 %}style="color: var(--accent-color);"{% endif %}>
+                    <td>{{ item.product_name }}</td>
+                    <td>{{ item.category }}</td>
+                    <td>{{ item.warehouse_name }}</td>
+                    <td>{{ item.current_stock }}</td>
+                    <td>{{ item.min_threshold }}</td>
+                    <td>{{ item.stock_level }}%</td>
+                    <td>₹{{ item.unit_price|round(2) }}</td>
+                    <td>₹{{ item.total_value|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if data.recommendations %}
+    <!-- Recommendations -->
+    <div class="report-section">
+        <h2>Recommendations</h2>
+        <ul>
+            {% for rec in data.recommendations %}
+            <li>{{ rec }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+{% endblock %}
