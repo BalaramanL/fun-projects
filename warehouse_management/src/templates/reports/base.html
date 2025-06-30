@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BlinkIt Warehouse Management System{% endblock %}</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+            --text-color: #333;
+            --light-bg: #f9f9f9;
+            --border-color: #ddd;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-bg);
+        }
+        
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3, h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        header h1 {
+            color: white;
+        }
+        
+        .report-info {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .report-info p {
+            margin: 0.5rem 0;
+        }
+        
+        .report-section {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        
+        table, th, td {
+            border: 1px solid var(--border-color);
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background-color: var(--light-bg);
+        }
+        
+        .chart-container {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .summary-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            flex: 1;
+            min-width: 200px;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 0.5rem 0;
+        }
+        
+        .stat-card.warning .stat-value {
+            color: var(--accent-color);
+        }
+        
+        .stat-card.success .stat-value {
+            color: var(--secondary-color);
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            color: #777;
+            font-size: 0.9rem;
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+            }
+            
+            .container {
+                width: 100%;
+                max-width: none;
+                padding: 0;
+            }
+            
+            .report-section, .report-info {
+                box-shadow: none;
+                border: 1px solid var(--border-color);
+                break-inside: avoid;
+            }
+            
+            header {
+                background-color: white;
+                color: var(--primary-color);
+                box-shadow: none;
+                border-bottom: 2px solid var(--primary-color);
+            }
+            
+            header h1 {
+                color: var(--primary-color);
+            }
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{% block report_title %}BlinkIt Warehouse Report{% endblock %}</h1>
+        </header>
+        
+        <div class="report-info">
+            <p><strong>Generated:</strong> {% block generated_at %}{% endblock %}</p>
+            <p><strong>Period:</strong> {% block report_period %}{% endblock %}</p>
+            {% block report_filters %}{% endblock %}
+        </div>
+        
+        {% block content %}{% endblock %}
+        
+        <footer>
+            <p>BlinkIt Warehouse Management System &copy; {% now 'Y' %}</p>
+        </footer>
+    </div>
+</body>
+</html>

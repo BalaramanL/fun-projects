@@ -1,0 +1,44 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+
+# Database files
+*.db
+*.db-journal
+
+# Output files
+outputs/logs/*
+outputs/reports/*
+outputs/plots/*
+!outputs/logs/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/plots/.gitkeep
+
+# Data exports
+data/exports/*
+!data/exports/.gitkeep
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/

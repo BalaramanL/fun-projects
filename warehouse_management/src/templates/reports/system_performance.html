@@ -1,0 +1,253 @@
+{% extends "reports/base.html" %}
+
+{% block title %}System Performance Report - BlinkIt WMS{% endblock %}
+
+{% block report_title %}{{ data.title }}{% endblock %}
+
+{% block generated_at %}{{ data.generated_at }}{% endblock %}
+
+{% block report_period %}
+    {% if data.period %}
+        {{ data.period.start_date }} to {{ data.period.end_date }}
+    {% else %}
+        Current Snapshot
+    {% endif %}
+{% endblock %}
+
+{% block report_filters %}
+    {% if data.filters %}
+        <p><strong>Filters:</strong>
+            {% if data.filters.metric_type %} Metric Type: {{ data.filters.metric_type }}{% endif %}
+            {% if data.filters.log_level %} Log Level: {{ data.filters.log_level }}{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Summary Statistics -->
+    <div class="report-section">
+        <h2>Summary</h2>
+        <div class="summary-stats">
+            {% if data.summary.total_metrics is defined %}
+            <div class="stat-card">
+                <h3>Total Metrics</h3>
+                <div class="stat-value">{{ data.summary.total_metrics }}</div>
+            </div>
+            {% endif %}
+            
+            {% if data.summary.total_errors is defined %}
+            <div class="stat-card {% if data.summary.total_errors > 0 %}warning{% endif %}">
+                <h3>Total Errors</h3>
+                <div class="stat-value">{{ data.summary.total_errors }}</div>
+            </div>
+            {% endif %}
+            
+            {% if data.resources %}
+            <div class="stat-card {% if data.resources.cpu_percent > 80 %}warning{% endif %}">
+                <h3>CPU Usage</h3>
+                <div class="stat-value">{{ data.resources.cpu_percent|round(1) }}%</div>
+            </div>
+            <div class="stat-card {% if data.resources.memory_percent > 80 %}warning{% endif %}">
+                <h3>Memory Usage</h3>
+                <div class="stat-value">{{ data.resources.memory_percent|round(1) }}%</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if data.generate_charts %}
+    <!-- Charts -->
+    <div class="report-section">
+        <h2>Visualizations</h2>
+        {% if data.time_series_data %}
+        <div class="chart-container">
+            <h3>Metrics Over Time</h3>
+            <img src="{{ data.charts.metrics_over_time }}" alt="Metrics Over Time" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        
+        {% if data.pie_data %}
+        <div class="chart-container">
+            <h3>Resource Usage</h3>
+            <img src="{{ data.charts.resource_usage }}" alt="Resource Usage" style="max-width: 100%;">
+        </div>
+        {% endif %}
+        
+        {% if data.summary.error_types %}
+        <div class="chart-container">
+            <h3>Error Distribution</h3>
+            <img src="{{ data.charts.error_distribution }}" alt="Error Distribution" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- System Metrics -->
+    {% if data.summary.metric_types %}
+    <div class="report-section">
+        <h2>Metric Types</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric Type</th>
+                    <th>Count</th>
+                    <th>Min</th>
+                    <th>Max</th>
+                    <th>Average</th>
+                    <th>Median</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric_type, stats in data.summary.metric_types.items() %}
+                <tr>
+                    <td>{{ metric_type }}</td>
+                    <td>{{ stats.count }}</td>
+                    <td>{{ stats.min|round(2) }}</td>
+                    <td>{{ stats.max|round(2) }}</td>
+                    <td>{{ stats.avg|round(2) }}</td>
+                    <td>{{ stats.median|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Error Summary -->
+    {% if data.summary.error_types %}
+    <div class="report-section">
+        <h2>Error Summary</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Error Type</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for error_type, count in data.summary.error_types.items() %}
+                <tr>
+                    <td>{{ error_type }}</td>
+                    <td>{{ count }}</td>
+                    <td>{{ (count / data.summary.total_errors * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="report-section">
+        <h2>Error Sources</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source, count in data.summary.sources.items() %}
+                <tr>
+                    <td>{{ source }}</td>
+                    <td>{{ count }}</td>
+                    <td>{{ (count / data.summary.total_errors * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Resource Usage -->
+    {% if data.resources %}
+    <div class="report-section">
+        <h2>Resource Usage</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Resource</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CPU Usage</td>
+                    <td>{{ data.resources.cpu_percent|round(1) }}%</td>
+                </tr>
+                <tr>
+                    <td>Memory Usage</td>
+                    <td>{{ data.resources.memory_percent|round(1) }}% ({{ (data.resources.memory_used / (1024*1024))|round(1) }} MB / {{ (data.resources.memory_total / (1024*1024))|round(1) }} MB)</td>
+                </tr>
+                <tr>
+                    <td>Disk Usage</td>
+                    <td>{{ data.resources.disk_percent|round(1) }}% ({{ (data.resources.disk_used / (1024*1024*1024))|round(1) }} GB / {{ (data.resources.disk_total / (1024*1024*1024))|round(1) }} GB)</td>
+                </tr>
+                {% if data.resources.database_size_mb %}
+                <tr>
+                    <td>Database Size</td>
+                    <td>{{ data.resources.database_size_mb|round(1) }} MB</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- Metrics Details -->
+    {% if data.items %}
+    <div class="report-section">
+        <h2>Metrics Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Value</th>
+                    <th>Unit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in data.items %}
+                <tr>
+                    <td>{{ metric.timestamp }}</td>
+                    <td>{{ metric.metric_type }}</td>
+                    <td>{{ metric.metric_name }}</td>
+                    <td>{{ metric.value|round(2) }}</td>
+                    <td>{{ metric.unit }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <!-- System Logs -->
+    {% if data.items and data.filters.log_level %}
+    <div class="report-section">
+        <h2>System Logs</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Level</th>
+                    <th>Source</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in data.items %}
+                <tr>
+                    <td>{{ log.timestamp }}</td>
+                    <td>{{ log.level }}</td>
+                    <td>{{ log.source }}</td>
+                    <td>{{ log.message }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+{% endblock %}
