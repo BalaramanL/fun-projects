@@ -67,7 +67,7 @@ def simulate_deliveries(config: Dict[str, Any],
     # Process each order
     for order in deliverable_orders:
         # Extract data
-        order_id = order['id']
+        order_id = order.get('order_id', order.get('id'))  # Support both formats
         warehouse_id = order['warehouse_fulfilled']
         warehouse_lat = None
         warehouse_lon = None
@@ -109,7 +109,7 @@ def simulate_deliveries(config: Dict[str, Any],
         
         # Create delivery record
         delivery = {
-            "id": str(uuid.uuid4()),
+            "delivery_id": str(uuid.uuid4()),
             "order_id": order_id,
             "warehouse_id": warehouse_id,
             "customer_latitude": customer_lat,
@@ -380,3 +380,59 @@ def calculate_delivery_metrics(deliveries: List[Dict[str, Any]]) -> Dict[str, An
         "average_delay_minutes": average_delay,
         "average_distance_km": average_distance
     }
+
+
+class DeliverySimulation:
+    """
+    Class for simulating delivery operations.
+    
+    This class provides methods to simulate deliveries based on orders and
+    delivery agent configurations.
+    """
+    
+    def __init__(self, config: Dict[str, Any] = None):
+        """
+        Initialize the delivery simulation with optional configuration.
+        
+        Args:
+            config: Configuration dictionary for the simulation
+        """
+        self.config = config or {
+            'avg_delivery_speed_kmh': 20,
+            'delivery_time_std_minutes': 15,
+            'delivery_success_rate': 0.95,
+            'num_delivery_agents': 10
+        }
+    
+    def simulate(self, order_data: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Run the delivery simulation with order data.
+        
+        Args:
+            order_data: Order data from order simulation
+            
+        Returns:
+            Dictionary with simulation results
+        """
+        return simulate_deliveries(self.config, order_data)
+    
+    def create_and_run_custom_scenario(self, scenario_config: Dict[str, Any], 
+                                      order_data: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Create and run a custom delivery scenario.
+        
+        Args:
+            scenario_config: Configuration for the custom scenario
+            order_data: Order data from order simulation
+            
+        Returns:
+            Dictionary with scenario results
+        """
+        # Extract delivery configuration from scenario
+        delivery_config = scenario_config.get('delivery_config', {})
+        
+        # Merge with default config
+        config = {**self.config, **delivery_config}
+        
+        # Run simulation with merged config
+        return simulate_deliveries(config, order_data)

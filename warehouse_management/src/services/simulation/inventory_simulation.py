@@ -14,7 +14,9 @@ import numpy as np
 import pandas as pd
 
 from src.utils.helpers import get_db_session
-from src.models.database import Product, Warehouse, Inventory
+from src.models.product import Product
+from src.models.warehouse import Warehouse
+from src.models.inventory import Inventory
 
 logger = logging.getLogger(__name__)
 
@@ -219,14 +221,24 @@ def _load_inventory() -> List[Dict[str, Any]]:
         with get_db_session() as session:
             inventory = []
             for item in session.query(Inventory).all():
-                inventory.append({
-                    "id": item.id,
-                    "warehouse_id": item.warehouse_id,
-                    "product_id": item.product_id,
-                    "current_stock": item.current_stock,
-                    "min_threshold": item.min_threshold,
-                    "max_capacity": item.max_capacity
-                })
+                # Skip None items
+                if item is None:
+                    logger.warning("Skipping None inventory item")
+                    continue
+                    
+                # Verify all required attributes exist
+                try:
+                    inventory.append({
+                        "id": item.inventory_id,  # Always use inventory_id as the primary key
+                        "warehouse_id": item.warehouse_id,
+                        "product_id": item.product_id,
+                        "current_stock": item.current_stock,
+                        "min_threshold": item.min_threshold,
+                        "max_capacity": item.max_capacity
+                    })
+                except AttributeError as ae:
+                    logger.error(f"Inventory item missing required attribute: {str(ae)}")
+                    continue
             return inventory
     except Exception as e:
         logger.error(f"Error loading inventory: {str(e)}")
@@ -244,11 +256,11 @@ def _load_products() -> List[Dict[str, Any]]:
             products = []
             for product in session.query(Product).all():
                 products.append({
-                    "id": product.id,
+                    "id": product.product_id,
                     "name": product.name,
                     "category": product.category,
                     "price": product.price,
-                    "weight": product.weight
+                    "weight_grams": product.weight_grams  # Use weight_grams instead of weight
                 })
             return products
     except Exception as e:
@@ -267,11 +279,12 @@ def _load_warehouses() -> List[Dict[str, Any]]:
             warehouses = []
             for warehouse in session.query(Warehouse).all():
                 warehouses.append({
-                    "id": warehouse.id,
+                    "id": warehouse.warehouse_id,
                     "name": warehouse.name,
                     "latitude": warehouse.latitude,
                     "longitude": warehouse.longitude,
-                    "capacity": warehouse.capacity
+                    "capacity": warehouse.capacity_sqm,  # Keep capacity_sqm but map to capacity in dict
+                    "capacity_sqm": warehouse.capacity_sqm  # Also include the original field name
                 })
             return warehouses
     except Exception as e:
@@ -391,3 +404,59 @@ def _simulate_random_adjustments(inventory_lookup: Dict[str, Dict[str, Dict[str,
                 })
     
     return adjustments
+
+
+class InventorySimulation:
+    """
+    Class for simulating inventory changes and management.
+    
+    This class provides methods to simulate inventory changes based on orders,
+    restocking, and other events.
+    """
+    
+    def __init__(self, config: Dict[str, Any] = None):
+        """
+        Initialize the inventory simulation with optional configuration.
+        
+        Args:
+            config: Configuration dictionary for the simulation
+        """
+        self.config = config or {
+            'restock_target_fill_percentage': 80,
+            'min_restock_quantity': 10,
+            'adjustment_probability': 0.05,
+            'max_adjustment_percentage': 5
+        }
+    
+    def simulate(self, order_data: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Run the inventory simulation with optional order data.
+        
+        Args:
+            order_data: Optional order data from order simulation
+            
+        Returns:
+            Dictionary with simulation results
+        """
+        return simulate_inventory(self.config, order_data)
+    
+    def create_and_run_custom_scenario(self, scenario_config: Dict[str, Any], 
+                                      order_data: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Create and run a custom inventory scenario.
+        
+        Args:
+            scenario_config: Configuration for the custom scenario
+            order_data: Optional order data from order simulation
+            
+        Returns:
+            Dictionary with scenario results
+        """
+        # Extract inventory configuration from scenario
+        inventory_config = scenario_config.get('inventory_config', {})
+        
+        # Merge with default config
+        config = {**self.config, **inventory_config}
+        
+        # Run simulation with merged config
+        return simulate_inventory(config, order_data)

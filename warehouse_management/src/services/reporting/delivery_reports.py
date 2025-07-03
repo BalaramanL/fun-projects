@@ -12,7 +12,10 @@ import pandas as pd
 import numpy as np
 
 from src.utils.helpers import get_db_session
-from src.models.database import Order, Delivery, DeliveryAgent, Customer, Warehouse
+from src.models.warehouse import Warehouse
+from src.models.customer import Customer
+from src.models.order import Order
+from src.models.delivery import Delivery, DeliveryAgent
 from src.services.reporting.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -187,16 +190,16 @@ class DeliveryReports:
                 query = session.query(
                     Delivery, Order, DeliveryAgent, Customer, Warehouse
                 ).join(
-                    Order, Delivery.order_id == Order.id
+                    Order, Delivery.order_id == Order.order_id
                 ).join(
-                    DeliveryAgent, Delivery.agent_id == DeliveryAgent.id
+                    DeliveryAgent, Delivery.agent_id == DeliveryAgent.agent_id
                 ).join(
-                    Customer, Order.customer_id == Customer.id
+                    Customer, Order.customer_id == Customer.customer_id
                 ).join(
-                    Warehouse, Order.warehouse_id == Warehouse.id
+                    Warehouse, Order.warehouse_id == Warehouse.warehouse_id
                 ).filter(
-                    Delivery.dispatch_time >= start_datetime,
-                    Delivery.dispatch_time <= end_datetime
+                    Delivery.picked_up_at >= start_datetime,
+                    Delivery.picked_up_at <= end_datetime
                 )
                 
                 # Apply warehouse filter if provided
@@ -210,8 +213,8 @@ class DeliveryReports:
                 delivery_data = []
                 for delivery, order, agent, customer, warehouse in results:
                     # Calculate delivery time in minutes
-                    if delivery.actual_delivery_time and delivery.dispatch_time:
-                        delivery_time = (delivery.actual_delivery_time - delivery.dispatch_time).total_seconds() / 60
+                    if delivery.delivered_at and delivery.picked_up_at:
+                        delivery_time = (delivery.delivered_at - delivery.picked_up_at).total_seconds() / 60
                     else:
                         delivery_time = None
                     
@@ -224,17 +227,17 @@ class DeliveryReports:
                     
                     # Add delivery to results
                     delivery_data.append({
-                        "delivery_id": delivery.id,
-                        "order_id": order.id,
+                        "delivery_id": delivery.delivery_id if hasattr(delivery, 'delivery_id') else delivery.id,
+                        "order_id": order.order_id,
                         "agent_id": agent.id,
                         "agent_name": agent.name,
-                        "customer_id": customer.id,
+                        "customer_id": customer.customer_id,
                         "customer_name": customer.name,
-                        "warehouse_id": warehouse.id,
+                        "warehouse_id": warehouse.warehouse_id,
                         "warehouse_name": warehouse.name,
-                        "dispatch_time": delivery.dispatch_time.isoformat() if delivery.dispatch_time else None,
-                        "estimated_delivery_time": delivery.estimated_delivery_time.isoformat() if delivery.estimated_delivery_time else None,
-                        "actual_delivery_time": delivery.actual_delivery_time.isoformat() if delivery.actual_delivery_time else None,
+                        "dispatch_time": delivery.picked_up_at.isoformat() if delivery.picked_up_at else None,
+                        "estimated_delivery_time": None,  # No estimated_delivery_time field in model
+                        "actual_delivery_time": delivery.delivered_at.isoformat() if delivery.delivered_at else None,
                         "status": delivery.status,
                         "distance_km": delivery.distance_km,
                         "delivery_time_minutes": delivery_time,

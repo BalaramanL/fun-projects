@@ -1,7 +1,7 @@
 """
 Order simulation module for the warehouse management system.
 
-This module provides functions for simulating order generation and fulfillment.
+This module provides functions and classes for simulating order generation and fulfillment.
 """
 import logging
 import datetime
@@ -13,7 +13,9 @@ import numpy as np
 import pandas as pd
 
 from src.utils.helpers import get_db_session
-from src.models.database import Product, Warehouse, Customer
+from src.models.product import Product
+from src.models.warehouse import Warehouse
+from src.models.customer import Customer
 
 logger = logging.getLogger(__name__)
 
@@ -125,11 +127,14 @@ def _load_products() -> List[Dict[str, Any]]:
             products = []
             for product in session.query(Product).all():
                 products.append({
-                    "id": product.id,
+                    "product_id": product.product_id,
                     "name": product.name,
                     "category": product.category,
+                    "subcategory": product.subcategory,
                     "price": product.price,
-                    "weight": product.weight
+                    "weight_grams": product.weight_grams,
+                    "shelf_life_days": product.shelf_life_days,
+                    "requires_refrigeration": product.requires_refrigeration
                 })
             return products
     except Exception as e:
@@ -148,11 +153,16 @@ def _load_warehouses() -> List[Dict[str, Any]]:
             warehouses = []
             for warehouse in session.query(Warehouse).all():
                 warehouses.append({
-                    "id": warehouse.id,
+                    "warehouse_id": warehouse.warehouse_id,
                     "name": warehouse.name,
+                    "address": warehouse.address,
+                    "city": warehouse.city,
+                    "state": warehouse.state,
+                    "pincode": warehouse.pincode,
                     "latitude": warehouse.latitude,
                     "longitude": warehouse.longitude,
-                    "capacity": warehouse.capacity
+                    "capacity_sqm": warehouse.capacity_sqm,
+                    "refrigerated_capacity_sqm": warehouse.refrigerated_capacity_sqm
                 })
             return warehouses
     except Exception as e:
@@ -171,7 +181,7 @@ def _load_customers() -> List[Dict[str, Any]]:
             customers = []
             for customer in session.query(Customer).all():
                 customers.append({
-                    "id": customer.id,
+                    "customer_id": customer.customer_id,
                     "name": customer.name,
                     "email": customer.email,
                     "phone": customer.phone,
@@ -238,7 +248,7 @@ def _generate_order(current_date: datetime.date,
         item_total = item_price * quantity
         
         items.append({
-            "product_id": product['id'],
+            "product_id": product['product_id'],
             "product_name": product['name'],
             "quantity": quantity,
             "unit_price": item_price,
@@ -259,17 +269,18 @@ def _generate_order(current_date: datetime.date,
     
     # Create order
     order = {
-        "id": str(uuid.uuid4()),
-        "customer_id": customer['id'],
+        "order_id": str(uuid.uuid4()),
+        "customer_id": customer['customer_id'],
         "customer_name": customer['name'],
-        "customer_pincode": customer['pincode'],
-        "customer_latitude": customer['latitude'],
-        "customer_longitude": customer['longitude'],
+        "customer_pincode": customer.get('pincode', ''),
+        "customer_latitude": customer.get('latitude'),
+        "customer_longitude": customer.get('longitude'),
+        "delivery_address": customer.get('address', ''),
         "timestamp": order_time.isoformat(),
         "items": items,
         "total_amount": total_amount,
         "status": status,
-        "warehouse_fulfilled": warehouse['id'],
+        "warehouse_fulfilled": warehouse['warehouse_id'],
         "warehouse_name": warehouse['name']
     }
     
@@ -327,3 +338,63 @@ def generate_weekly_order_pattern(config: Dict[str, Any]) -> Dict[int, float]:
     # Normalize to ensure sum is 1.0
     total = sum(pattern.values())
     return {day: weight / total for day, weight in pattern.items()}
+
+
+class OrderSimulation:
+    """
+    Class for simulating order generation and processing.
+    
+    This class provides methods to simulate orders based on various parameters
+    and configurations.
+    """
+    
+    def __init__(self, config: Dict[str, Any] = None):
+        """
+        Initialize the order simulation with optional configuration.
+        
+        Args:
+            config: Configuration dictionary for the simulation
+        """
+        self.config = config or {
+            'daily_order_mean': 100,
+            'daily_order_std': 20,
+            'weekend_multiplier': 1.5,
+            'items_per_order_mean': 3,
+            'items_per_order_std': 1,
+        }
+    
+    def simulate(self, duration_days: int = 7, start_date: Optional[datetime.date] = None) -> Dict[str, Any]:
+        """
+        Run the order simulation for the specified duration.
+        
+        Args:
+            duration_days: Number of days to simulate
+            start_date: Starting date for the simulation
+            
+        Returns:
+            Dictionary with simulation results
+        """
+        return simulate_orders(self.config, duration_days, start_date)
+    
+    def create_and_run_custom_scenario(self, scenario_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create and run a custom order scenario.
+        
+        Args:
+            scenario_config: Configuration for the custom scenario
+            
+        Returns:
+            Dictionary with scenario results
+        """
+        # Extract order configuration from scenario
+        order_config = scenario_config.get('order_config', {})
+        
+        # Merge with default config
+        config = {**self.config, **order_config}
+        
+        # Extract duration and dates
+        duration_days = scenario_config.get('duration_days', 7)
+        start_date = scenario_config.get('start_date', None)
+        
+        # Run simulation with merged config
+        return simulate_orders(config, duration_days, start_date)

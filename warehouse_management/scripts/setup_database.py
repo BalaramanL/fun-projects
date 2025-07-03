@@ -66,19 +66,16 @@ SCHEMA_DEFINITIONS = [
     # Inventory table
     """
     CREATE TABLE IF NOT EXISTS inventory (
-        inventory_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inventory_id TEXT PRIMARY KEY,
         warehouse_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
-        min_threshold INTEGER,
-        max_threshold INTEGER,
-        last_restock_date TIMESTAMP,
-        last_stockout_date TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        current_stock INTEGER NOT NULL,
+        min_threshold INTEGER NOT NULL,
+        max_capacity INTEGER NOT NULL,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id),
         FOREIGN KEY (product_id) REFERENCES products(product_id),
-        UNIQUE(warehouse_id, product_id)
+        UNIQUE (warehouse_id, product_id)
     )
     """,
     
@@ -89,8 +86,9 @@ SCHEMA_DEFINITIONS = [
         customer_id TEXT NOT NULL,
         warehouse_id TEXT NOT NULL,
         order_date TIMESTAMP NOT NULL,
-        delivery_address TEXT NOT NULL,
-        delivery_pincode TEXT NOT NULL,
+        shipping_address TEXT NOT NULL,
+        shipping_pincode TEXT NOT NULL,
+        delivery_address TEXT,
         delivery_latitude REAL,
         delivery_longitude REAL,
         total_amount REAL NOT NULL,
@@ -105,7 +103,7 @@ SCHEMA_DEFINITIONS = [
     # Order items table
     """
     CREATE TABLE IF NOT EXISTS order_items (
-        order_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id TEXT PRIMARY KEY,
         order_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
         quantity INTEGER NOT NULL,
@@ -173,11 +171,11 @@ SCHEMA_DEFINITIONS = [
     # System metrics table
     """
     CREATE TABLE IF NOT EXISTS system_metrics (
-        metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        metric_type TEXT NOT NULL,
+        metric_id TEXT PRIMARY KEY,
         metric_name TEXT NOT NULL,
-        value REAL NOT NULL,
-        unit TEXT,
+        metric_value REAL NOT NULL,
+        metric_unit TEXT NOT NULL,
+        component TEXT NOT NULL,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -238,7 +236,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(status)",
     "CREATE INDEX IF NOT EXISTS idx_inventory_changes_product ON inventory_changes(product_id)",
     "CREATE INDEX IF NOT EXISTS idx_inventory_changes_warehouse ON inventory_changes(warehouse_id)",
-    "CREATE INDEX IF NOT EXISTS idx_system_metrics_type ON system_metrics(metric_type)",
+    "CREATE INDEX IF NOT EXISTS idx_system_metrics_name ON system_metrics(metric_name)",
+    "CREATE INDEX IF NOT EXISTS idx_system_metrics_component ON system_metrics(component)",
     "CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level)",
     "CREATE INDEX IF NOT EXISTS idx_system_logs_source ON system_logs(source)",
     "CREATE INDEX IF NOT EXISTS idx_customers_pincode ON customers(pincode)"
@@ -251,7 +250,12 @@ def setup_database(db_path):
     # Create the data directory if it doesn't exist
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
-    # Connect to the database
+    # Delete the existing database file if it exists
+    if os.path.exists(db_path):
+        logger.info(f"Removing existing database file at {db_path}")
+        os.remove(db_path)
+    
+    # Connect to the database (this will create a new file)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     

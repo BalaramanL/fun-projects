@@ -18,17 +18,21 @@ class Product(Base):
     """
     __tablename__ = "products"
     
-    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    product_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, index=True, nullable=False)
     category = Column(String, index=True, nullable=False)
-    subcategory = Column(String, index=True, nullable=False)
+    subcategory = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
     price = Column(Float, nullable=False)
-    unit_type = Column(String, nullable=False)
-    shelf_life_days = Column(Integer, nullable=False)
+    weight_grams = Column(Integer, nullable=True)
+    volume_ml = Column(Integer, nullable=True)
+    shelf_life_days = Column(Integer, nullable=True)
+    requires_refrigeration = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def __repr__(self) -> str:
-        return f"<Product(id={self.id}, name={self.name}, category={self.category})>"
+        return f"<Product(product_id={self.product_id}, name={self.name}, category={self.category})>"
 
 
 class ProductBase(BaseModel):
@@ -37,10 +41,13 @@ class ProductBase(BaseModel):
     """
     name: str
     category: str
-    subcategory: str
+    subcategory: Optional[str] = None
+    brand: Optional[str] = None
     price: float = Field(gt=0)
-    unit_type: str
-    shelf_life_days: int = Field(gt=0)
+    weight_grams: Optional[int] = None
+    volume_ml: Optional[int] = None
+    shelf_life_days: Optional[int] = None
+    requires_refrigeration: Optional[int] = 0
     
     @validator('price')
     def price_must_be_positive(cls, v: float) -> float:
@@ -71,9 +78,12 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
     subcategory: Optional[str] = None
+    brand: Optional[str] = None
     price: Optional[float] = None
-    unit_type: Optional[str] = None
+    weight_grams: Optional[int] = None
+    volume_ml: Optional[int] = None
     shelf_life_days: Optional[int] = None
+    requires_refrigeration: Optional[int] = None
     
     @validator('price')
     def price_must_be_positive(cls, v: Optional[float]) -> Optional[float]:
@@ -94,8 +104,8 @@ class ProductResponse(ProductBase):
     """
     Pydantic model for product response.
     """
-    id: str
+    product_id: str
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -1,0 +1,36 @@
+{% extends "reports/generic_report.html" %}
+
+{% block additional_content %}
+<div class="section">
+    <h2>System Performance Metrics</h2>
+    <div class="chart-container">
+        {% if charts and charts.time_series %}
+        <img src="{{ charts.time_series }}" alt="System Performance Metrics Chart">
+        {% else %}
+        <p>No system metrics chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Resource Utilization</h2>
+    <div class="chart-container">
+        {% if charts and charts.bar %}
+        <img src="{{ charts.bar }}" alt="Resource Utilization Chart">
+        {% else %}
+        <p>No resource utilization chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Performance Distribution</h2>
+    <div class="chart-container">
+        {% if charts and charts.distribution %}
+        <img src="{{ charts.distribution }}" alt="Performance Distribution Chart">
+        {% else %}
+        <p>No performance distribution chart available</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

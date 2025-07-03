@@ -7,12 +7,16 @@ import logging
 import datetime
 from typing import Dict, List, Any, Optional, Union
 from collections import defaultdict
+from sqlalchemy import func
 
 import pandas as pd
 import numpy as np
 
 from src.utils.helpers import get_db_session
-from src.models.database import Warehouse, Order, Inventory, Product
+from src.models.warehouse import Warehouse
+from src.models.order import Order, OrderItem
+from src.models.inventory import Inventory
+from src.models.product import Product
 from src.services.reporting.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -90,8 +94,8 @@ class WarehousePerformanceReports:
                 "items_per_day": {date: metrics["item_count"] for date, metrics in daily_metrics.items()}
             },
             "pie_data": {
-                warehouse["name"]: metrics["total_orders"]
-                for warehouse, metrics in efficiency_metrics.items()
+                efficiency_metrics[warehouse_id]["name"]: metrics["total_orders"]
+                for warehouse_id, metrics in efficiency_metrics.items()
                 if "total_orders" in metrics
             }
         }
@@ -145,8 +149,8 @@ class WarehousePerformanceReports:
             "category_breakdown": category_breakdown,
             "generate_charts": True,
             "pie_data": {
-                warehouse["name"]: metrics["utilization_percent"]
-                for warehouse, metrics in capacity_metrics.items()
+                self._get_warehouse_name(warehouse_id, warehouse_data): metrics["utilization_percent"]
+                for warehouse_id, metrics in capacity_metrics.items()
                 if "utilization_percent" in metrics
             }
         }
@@ -176,7 +180,7 @@ class WarehousePerformanceReports:
                 
                 # Apply filter if provided
                 if warehouse_id:
-                    query = query.filter(Warehouse.id == warehouse_id)
+                    query = query.filter(Warehouse.warehouse_id == warehouse_id)
                 
                 # Execute query
                 results = query.all()
@@ -185,7 +189,7 @@ class WarehousePerformanceReports:
                 warehouse_data = []
                 for warehouse in results:
                     warehouse_data.append({
-                        "id": warehouse.id,
+                        "id": warehouse.warehouse_id,
                         "name": warehouse.name,
                         "address": warehouse.address,
                         "city": warehouse.city,
@@ -193,8 +197,8 @@ class WarehousePerformanceReports:
                         "pincode": warehouse.pincode,
                         "latitude": warehouse.latitude,
                         "longitude": warehouse.longitude,
-                        "capacity": warehouse.capacity,
-                        "operating_hours": warehouse.operating_hours
+                        "capacity": warehouse.capacity_sqm,
+                        "operating_hours": warehouse.operational_hours
                     })
                 
                 return warehouse_data
@@ -225,7 +229,7 @@ class WarehousePerformanceReports:
                 
                 # Build query
                 query = session.query(Order, Warehouse).join(
-                    Warehouse, Order.warehouse_id == Warehouse.id
+                    Warehouse, Order.warehouse_id == Warehouse.warehouse_id
                 ).filter(
                     Order.order_date >= start_datetime,
                     Order.order_date <= end_datetime
@@ -245,13 +249,13 @@ class WarehousePerformanceReports:
                     item_count = session.query(
                         func.sum(OrderItem.quantity)
                     ).filter(
-                        OrderItem.order_id == order.id
+                        OrderItem.order_id == order.order_id
                     ).scalar() or 0
                     
                     # Add order to results
                     order_data.append({
-                        "order_id": order.id,
-                        "warehouse_id": warehouse.id,
+                        "order_id": order.order_id,
+                        "warehouse_id": warehouse.warehouse_id,
                         "warehouse_name": warehouse.name,
                         "order_date": order.order_date.isoformat(),
                         "status": order.status,
@@ -280,14 +284,14 @@ class WarehousePerformanceReports:
                 query = session.query(
                     Inventory, Product, Warehouse
                 ).join(
-                    Product, Inventory.product_id == Product.id
+                    Product, Inventory.product_id == Product.product_id
                 ).join(
-                    Warehouse, Inventory.warehouse_id == Warehouse.id
+                    Warehouse, Inventory.warehouse_id == Warehouse.warehouse_id
                 )
                 
                 # Apply warehouse filter if provided
                 if warehouse_id:
-                    query = query.filter(Warehouse.id == warehouse_id)
+                    query = query.filter(Warehouse.warehouse_id == warehouse_id)
                 
                 # Execute query
                 results = query.all()
@@ -295,19 +299,34 @@ class WarehousePerformanceReports:
                 # Format results
                 inventory_data = []
                 for inv, product, warehouse in results:
-                    inventory_data.append({
-                        "inventory_id": inv.id,
-                        "warehouse_id": warehouse.id,
-                        "warehouse_name": warehouse.name,
-                        "product_id": product.id,
-                        "product_name": product.name,
-                        "category": product.category,
-                        "current_stock": inv.current_stock,
-                        "min_threshold": inv.min_threshold,
-                        "max_capacity": inv.max_capacity,
-                        "unit_price": product.price,
-                        "total_value": product.price * inv.current_stock
-                    })
+                    # Skip if any of the objects are None
+                    if inv is None or product is None or warehouse is None:
+                        if inv is None:
+                            logger.warning("Skipping inventory record: Inventory object is None")
+                        if product is None:
+                            logger.warning(f"Skipping inventory record: Product object is None for inventory_id={inv.inventory_id if inv and hasattr(inv, 'inventory_id') else 'unknown'}")
+                        if warehouse is None:
+                            logger.warning(f"Skipping inventory record: Warehouse object is None for inventory_id={inv.inventory_id if inv and hasattr(inv, 'inventory_id') else 'unknown'}")
+                        continue
+                    
+                    # Verify all required attributes exist
+                    try:
+                        inventory_data.append({
+                            "inventory_id": inv.inventory_id if hasattr(inv, 'inventory_id') else None,
+                            "warehouse_id": warehouse.warehouse_id,
+                            "warehouse_name": warehouse.name,
+                            "product_id": product.product_id,
+                            "product_name": product.name,
+                            "category": product.category,
+                            "current_stock": inv.current_stock,
+                            "min_threshold": inv.min_threshold,
+                            "max_capacity": inv.max_capacity,
+                            "unit_price": product.price,
+                            "total_value": product.price * inv.current_stock
+                        })
+                    except AttributeError as ae:
+                        logger.error(f"Inventory record missing required attribute: {str(ae)} for inventory_id={inv.inventory_id if hasattr(inv, 'inventory_id') else 'unknown'}")
+                        continue
                 
                 return inventory_data
         except Exception as e:
@@ -456,6 +475,22 @@ class WarehousePerformanceReports:
             metrics["utilization_percent"] = (metrics["current_stock"] / metrics["total_capacity"]) * 100 if metrics["total_capacity"] > 0 else 0
         
         return capacity_metrics
+    
+    def _get_warehouse_name(self, warehouse_id: str, warehouse_data: List[Dict[str, Any]]) -> str:
+        """
+        Get warehouse name from warehouse data by ID.
+        
+        Args:
+            warehouse_id: Warehouse ID
+            warehouse_data: List of warehouse dictionaries
+            
+        Returns:
+            Warehouse name or warehouse ID if not found
+        """
+        for warehouse in warehouse_data:
+            if warehouse["id"] == warehouse_id:
+                return warehouse["name"]
+        return warehouse_id  # Fallback to ID if name not found
     
     def _calculate_category_breakdown(self, inventory_data: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         """

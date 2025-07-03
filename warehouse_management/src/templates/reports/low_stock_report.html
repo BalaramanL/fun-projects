@@ -1,0 +1,29 @@
+{% extends "reports/generic_report.html" %}
+
+{% block additional_content %}
+<div class="section">
+    <h2>Low Stock Alerts</h2>
+    {% if alerts %}
+    {% for alert in alerts %}
+    <div class="alert alert-{{ alert.alert_level|lower }}">
+        <strong>{{ alert.product_name }}</strong> at {{ alert.warehouse_name }}:
+        {{ alert.current_stock }} units ({{ alert.stock_percentage|round(1) }}% of capacity)
+        <p><em>{{ alert.recommendation }}</em></p>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No low stock alerts at this time.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Stock Level Distribution</h2>
+    <div class="chart-container">
+        {% if charts and charts.distribution %}
+        <img src="{{ charts.distribution }}" alt="Stock Level Distribution Chart">
+        {% else %}
+        <p>No distribution chart available</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

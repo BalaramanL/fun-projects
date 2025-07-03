@@ -1,6 +1,7 @@
 """
 Events model for the warehouse management system.
-Defines SQLAlchemy ORM model and Pydantic validation models for purchase events.
+Defines SQLAlchemy ORM model and Pydantic validation models for purchase events,
+system metrics, and system logs.
 """
 import uuid
 from datetime import datetime
@@ -17,16 +18,16 @@ class PurchaseEvent(Base):
     """
     __tablename__ = "purchase_events"
     
-    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    event_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     timestamp = Column(DateTime, index=True, nullable=False, default=datetime.utcnow)
-    product_id = Column(String(36), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(String(36), ForeignKey("products.product_id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Integer, nullable=False)
     customer_pincode = Column(String, index=True, nullable=False)
-    warehouse_fulfilled = Column(String(36), ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    warehouse_fulfilled = Column(String(36), ForeignKey("warehouses.warehouse_id", ondelete="SET NULL"), nullable=True)
     delivery_time = Column(Integer, nullable=True)  # in minutes
     
     def __repr__(self) -> str:
-        return f"<PurchaseEvent(id={self.id}, product_id={self.product_id}, quantity={self.quantity})>"
+        return f"<PurchaseEvent(event_id={self.event_id}, product_id={self.product_id}, quantity={self.quantity})>"
 
 
 class PurchaseEventBase(BaseModel):
@@ -81,10 +82,10 @@ class PurchaseEventResponse(PurchaseEventBase):
     """
     Pydantic model for purchase event response.
     """
-    id: str
+    event_id: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PurchaseEventWithDetails(PurchaseEventResponse):
@@ -180,4 +181,100 @@ class PincodeMappingResponse(PincodeMappingBase):
     Pydantic model for pincode mapping response.
     """
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class SystemMetric(Base):
+    """
+    SQLAlchemy ORM model for system_metrics table.
+    """
+    __tablename__ = "system_metrics"
+    
+    metric_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    timestamp = Column(DateTime, index=True, nullable=False, default=datetime.utcnow)
+    metric_name = Column(String, index=True, nullable=False)
+    metric_value = Column(Float, nullable=False)
+    metric_unit = Column(String, nullable=False)
+    component = Column(String, index=True, nullable=False)  # database, api, worker, etc.
+    
+    def __repr__(self) -> str:
+        return f"<SystemMetric(metric_id={self.metric_id}, name={self.metric_name}, value={self.metric_value}, component={self.component})>"
+
+
+class SystemMetricBase(BaseModel):
+    """
+    Base Pydantic model for system metric data validation.
+    """
+    timestamp: datetime
+    metric_name: str
+    metric_value: float
+    metric_unit: str
+    component: str
+
+
+class SystemMetricCreate(SystemMetricBase):
+    """
+    Pydantic model for creating a new system metric.
+    """
+    pass
+
+
+class SystemMetricResponse(SystemMetricBase):
+    """
+    Pydantic model for system metric response.
+    """
+    metric_id: str
+    
+    class Config:
+        from_attributes = True
+
+
+class SystemLog(Base):
+    """
+    SQLAlchemy ORM model for system_logs table.
+    """
+    __tablename__ = "system_logs"
+    
+    log_id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, nullable=True, default=datetime.utcnow)
+    level = Column(String, nullable=False)  # INFO, WARNING, ERROR, CRITICAL
+    source = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    
+    def __repr__(self) -> str:
+        return f"<SystemLog(log_id={self.log_id}, level={self.level}, source={self.source})>"
+
+
+class SystemLogBase(BaseModel):
+    """
+    Base Pydantic model for system log data validation.
+    """
+    timestamp: Optional[datetime] = None
+    level: str
+    source: str
+    message: str
+    
+    @validator('level')
+    def level_must_be_valid(cls, v: str) -> str:
+        """Validate log level."""
+        valid_levels = ["INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v not in valid_levels:
+            raise ValueError(f'Level must be one of {valid_levels}')
+        return v
+
+
+class SystemLogCreate(SystemLogBase):
+    """
+    Pydantic model for creating a new system log.
+    """
+    pass
+
+
+class SystemLogResponse(SystemLogBase):
+    """
+    Pydantic model for system log response.
+    """
+    log_id: int
+    
+    class Config:
+        from_attributes = True

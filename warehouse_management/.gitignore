@@ -21,12 +21,14 @@ ENV/
 *.db-journal
 
 # Output files
-outputs/logs/*
-outputs/reports/*
-outputs/plots/*
+output/
+outputs/
+# Keep directory structure with empty .gitkeep files
 !outputs/logs/.gitkeep
 !outputs/reports/.gitkeep
 !outputs/plots/.gitkeep
+!outputs/charts/.gitkeep
+!outputs/data/.gitkeep
 
 # Data exports
 data/exports/*

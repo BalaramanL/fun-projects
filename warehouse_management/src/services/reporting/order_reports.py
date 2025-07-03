@@ -12,7 +12,10 @@ import pandas as pd
 import numpy as np
 
 from src.utils.helpers import get_db_session
-from src.models.database import Order, OrderItem, Product, Customer, Warehouse
+from src.models.product import Product
+from src.models.warehouse import Warehouse
+from src.models.customer import Customer
+from src.models.order import Order, OrderItem
 from src.services.reporting.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -191,6 +194,10 @@ class OrderReports:
             List of order dictionaries
         """
         try:
+            # Return empty list if dates are None
+            if not start_date or not end_date:
+                logger.warning("Missing start_date or end_date, returning empty order data")
+                return []
             with get_db_session() as session:
                 # Convert dates to datetime for comparison
                 start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
@@ -200,9 +207,9 @@ class OrderReports:
                 query = session.query(
                     Order, Customer, Warehouse
                 ).join(
-                    Customer, Order.customer_id == Customer.id
+                    Customer, Order.customer_id == Customer.customer_id
                 ).join(
-                    Warehouse, Order.warehouse_id == Warehouse.id
+                    Warehouse, Order.warehouse_id == Warehouse.warehouse_id
                 ).filter(
                     Order.order_date >= start_datetime,
                     Order.order_date <= end_datetime
@@ -222,29 +229,37 @@ class OrderReports:
                     order_items = session.query(
                         OrderItem, Product
                     ).join(
-                        Product, OrderItem.product_id == Product.id
+                        Product, OrderItem.product_id == Product.product_id
                     ).filter(
-                        OrderItem.order_id == order.id
+                        OrderItem.order_id == order.order_id
                     ).all()
                     
                     # Format order items
                     items = []
                     for item, product in order_items:
-                        items.append({
-                            "product_id": product.id,
-                            "product_name": product.name,
-                            "category": product.category,
-                            "quantity": item.quantity,
-                            "unit_price": item.unit_price,
-                            "total_price": item.total_price
-                        })
+                        # Skip None items or products
+                        if item is None or product is None:
+                            logger.warning("Skipping None order item or product")
+                            continue
+                            
+                        try:
+                            items.append({
+                                "product_id": product.product_id,
+                                "product_name": product.name,
+                                "category": product.category,
+                                "quantity": item.quantity,
+                                "unit_price": item.unit_price,
+                                "total_price": item.total_price
+                            })
+                        except Exception as e:
+                            logger.warning(f"Error processing order item: {str(e)}")
                     
                     # Add order to results
                     order_data.append({
-                        "order_id": order.id,
-                        "customer_id": customer.id,
+                        "order_id": order.order_id,
+                        "customer_id": customer.customer_id,
                         "customer_name": customer.name,
-                        "warehouse_id": warehouse.id,
+                        "warehouse_id": warehouse.warehouse_id,
                         "warehouse_name": warehouse.name,
                         "order_date": order.order_date.isoformat(),
                         "status": order.status,
@@ -365,7 +380,21 @@ class OrderReports:
             period_data = sales_by_period[period_key]
             period_data["order_count"] += 1
             period_data["total_sales"] += order["total_amount"]
-            period_data["items_sold"] += sum(item["quantity"] for item in order["items"])
+            
+            # Add defensive check for items
+            try:
+                # Sum quantities, skipping any items that don't have a quantity attribute
+                items_sold = 0
+                for item in order["items"]:
+                    if item and "quantity" in item:
+                        items_sold += item["quantity"]
+                    else:
+                        logger.warning(f"Skipping item without quantity in order {order.get('order_id', 'unknown')}")
+                period_data["items_sold"] += items_sold
+            except Exception as e:
+                logger.warning(f"Error calculating items_sold: {str(e)}")
+                # Default to 0 if calculation fails
+                period_data["items_sold"] += 0
         
         # Sort by period key
         return dict(sorted(sales_by_period.items()))
@@ -384,7 +413,18 @@ class OrderReports:
         
         for order in order_data:
             for item in order["items"]:
-                category = item.get("category", "Unknown")
-                category_sales[category] += item["total_price"]
+                # Skip None items
+                if not item:
+                    logger.warning(f"Skipping None item in order {order.get('order_id', 'unknown')}")
+                    continue
+                    
+                try:
+                    category = item.get("category", "Unknown")
+                    # Use get with default value to handle missing total_price
+                    total_price = item.get("total_price", 0)
+                    category_sales[category] += total_price
+                except Exception as e:
+                    logger.warning(f"Error processing category sales: {str(e)}")
+                    continue
         
         return dict(category_sales)

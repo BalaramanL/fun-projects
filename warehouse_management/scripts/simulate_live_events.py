@@ -62,7 +62,7 @@ class LiveEventSimulator:
                 SELECT p.product_id, p.price, i.warehouse_id
                 FROM products p
                 JOIN inventory i ON p.product_id = i.product_id
-                WHERE i.quantity > 0
+                WHERE i.current_stock > 0
             """)
             self.products = cursor.fetchall()
             
@@ -168,16 +168,17 @@ class LiveEventSimulator:
             cursor.execute("""
                 INSERT INTO orders (
                     order_id, customer_id, warehouse_id, order_date,
-                    delivery_address, delivery_pincode, delivery_latitude, delivery_longitude,
+                    shipping_address, shipping_pincode, delivery_address, delivery_latitude, delivery_longitude,
                     total_amount, status, payment_method
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 event["order"]["order_id"],
                 event["order"]["customer_id"],
                 event["order"]["warehouse_id"],
                 event["order"]["order_date"],
-                customer_data[0],  # address
-                customer_data[1],  # pincode
+                customer_data[0],  # shipping_address (same as customer address)
+                customer_data[1],  # shipping_pincode (same as customer pincode)
+                customer_data[0],  # delivery_address (same as customer address)
                 customer_data[2],  # latitude
                 customer_data[3],  # longitude
                 event["order"]["total_amount"],
@@ -202,7 +203,7 @@ class LiveEventSimulator:
                 # Update inventory
                 cursor.execute("""
                     UPDATE inventory
-                    SET quantity = quantity - ?
+                    SET current_stock = current_stock - ?
                     WHERE warehouse_id = ? AND product_id = ?
                 """, (
                     item["quantity"],
