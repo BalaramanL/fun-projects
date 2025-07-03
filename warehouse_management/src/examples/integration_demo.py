@@ -5,11 +5,16 @@ This script demonstrates how to integrate simulation and reporting modules
 to create a complete end-to-end workflow.
 """
 import os
+import sys
 import logging
 import datetime
 from pathlib import Path
 import json
 import pandas as pd
+
+# Add the project root to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 
 from src.services.simulation.order_simulation import OrderSimulation
 from src.services.simulation.inventory_simulation import InventorySimulation
@@ -101,10 +106,41 @@ def main():
     inventory_changes = scenario_results.get("inventory_changes", [])
     deliveries = scenario_results.get("deliveries", [])
     
+    # Ensure consistent attribute names
+    for order in orders:
+        if 'id' in order and 'order_id' not in order:
+            order['order_id'] = order['id']
+            
+    for inventory in inventory_changes:
+        if 'id' in inventory and 'inventory_id' not in inventory:
+            inventory['inventory_id'] = inventory['id']
+            
+    for delivery in deliveries:
+        if 'id' in delivery and 'delivery_id' not in delivery:
+            delivery['delivery_id'] = delivery['id']
+    
     # Save extracted data to CSV for analysis
     pd.DataFrame(orders).to_csv(data_dir / "simulated_orders.csv", index=False)
     pd.DataFrame(inventory_changes).to_csv(data_dir / "simulated_inventory.csv", index=False)
     pd.DataFrame(deliveries).to_csv(data_dir / "simulated_deliveries.csv", index=False)
+    
+    # Calculate summary statistics if not provided by the scenario
+    if "summary" not in scenario_results:
+        # Calculate average order value
+        total_order_value = sum(order.get("total_amount", 0) for order in orders)
+        avg_order_value = total_order_value / len(orders) if orders else 0
+        
+        # Create summary dictionary
+        scenario_results["summary"] = {
+            "total_orders": len(orders),
+            "total_order_value": total_order_value,
+            "avg_order_value": avg_order_value,
+            "total_inventory_changes": len(inventory_changes),
+            "total_deliveries": len(deliveries),
+            "on_time_delivery_rate": 0.95,  # Mock value for demo
+            "stockout_rate": 0.05,  # Mock value for demo
+            "total_revenue": total_order_value  # Use total order value as revenue
+        }
     
     logger.info(f"Simulation completed with {len(orders)} orders, {len(inventory_changes)} inventory changes, and {len(deliveries)} deliveries")
     
@@ -118,10 +154,7 @@ def main():
     # Generate inventory report
     inventory_report_path = inventory_reports.generate_inventory_snapshot(
         output_format='html',
-        filename=os.path.join(reports_dir, "inventory_snapshot.html"),
-        # In a real system, this would use database queries
-        # For the demo, we're passing the simulation data directly
-        simulation_data=inventory_changes
+        filename=os.path.join(reports_dir, "inventory_snapshot.html")
     )
     logger.info(f"Inventory snapshot report generated: {inventory_report_path}")
     
@@ -130,8 +163,7 @@ def main():
         start_date=start_date.date(),
         end_date=end_date.date(),
         output_format='html',
-        filename=os.path.join(reports_dir, "order_summary.html"),
-        simulation_data=orders
+        filename=os.path.join(reports_dir, "order_summary.html")
     )
     logger.info(f"Order summary report generated: {order_report_path}")
     
@@ -141,8 +173,7 @@ def main():
         end_date=end_date.date(),
         group_by='day',
         output_format='html',
-        filename=os.path.join(reports_dir, "sales_report.html"),
-        simulation_data=orders
+        filename=os.path.join(reports_dir, "sales_report.html")
     )
     logger.info(f"Sales report generated: {sales_report_path}")
     
@@ -151,8 +182,7 @@ def main():
         start_date=start_date.date(),
         end_date=end_date.date(),
         output_format='html',
-        filename=os.path.join(reports_dir, "delivery_performance.html"),
-        simulation_data=deliveries
+        filename=os.path.join(reports_dir, "delivery_performance.html")
     )
     logger.info(f"Delivery performance report generated: {delivery_report_path}")
     
@@ -161,11 +191,7 @@ def main():
         start_date=start_date.date(),
         end_date=end_date.date(),
         output_format='html',
-        filename=os.path.join(reports_dir, "warehouse_efficiency.html"),
-        simulation_data={
-            "orders": orders,
-            "inventory": inventory_changes
-        }
+        filename=os.path.join(reports_dir, "warehouse_efficiency.html")
     )
     logger.info(f"Warehouse efficiency report generated: {warehouse_report_path}")
     

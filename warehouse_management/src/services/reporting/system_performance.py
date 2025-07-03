@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from src.utils.helpers import get_db_session
-from src.models.database import SystemMetric, SystemLog
+from src.models.events import SystemMetric, SystemLog
 from src.services.reporting.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)

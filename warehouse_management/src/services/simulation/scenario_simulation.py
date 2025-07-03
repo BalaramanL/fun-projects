@@ -7,7 +7,9 @@ import logging
 import datetime
 from typing import Dict, List, Any, Optional
 
-from src.services.simulation import order_simulation, inventory_simulation, delivery_simulation
+from src.services.simulation.order_simulation import OrderSimulation
+from src.services.simulation.inventory_simulation import InventorySimulation
+from src.services.simulation.delivery_simulation import DeliverySimulation
 
 logger = logging.getLogger(__name__)
 
@@ -148,10 +150,14 @@ def run_end_to_end_simulation(config: Dict[str, Any],
     elif start_date is None:
         start_date = datetime.date.today()
     
+    # Initialize simulation classes
+    order_sim = OrderSimulation(config=config)
+    inventory_sim = InventorySimulation(config=config)
+    delivery_sim = DeliverySimulation(config=config)
+    
     # Simulate orders
     logger.info(f"Simulating orders for {duration_days} days from {start_date}")
-    order_results = order_simulation.simulate_orders(
-        config=config,
+    order_results = order_sim.simulate(
         duration_days=duration_days,
         start_date=start_date
     )
@@ -161,15 +167,13 @@ def run_end_to_end_simulation(config: Dict[str, Any],
     
     # Simulate inventory based on orders
     logger.info("Simulating inventory changes")
-    inventory_results = inventory_simulation.simulate_inventory(
-        config=config,
+    inventory_results = inventory_sim.simulate(
         order_data=order_results.get("orders", [])
     )
     
     # Simulate deliveries based on orders
     logger.info("Simulating deliveries")
-    delivery_results = delivery_simulation.simulate_deliveries(
-        config=config,
+    delivery_results = delivery_sim.simulate(
         order_data=order_results.get("orders", [])
     )
     
@@ -208,6 +212,65 @@ def get_available_scenarios() -> Dict[str, Dict[str, Any]]:
         }
     
     return scenario_info
+
+class ScenarioSimulation:
+    """
+    Class for running simulation scenarios.
+    
+    This class provides methods to run predefined and custom scenarios
+    using the order, inventory, and delivery simulation components.
+    """
+    
+    def __init__(self, order_simulation=None, inventory_simulation=None, delivery_simulation=None):
+        """
+        Initialize the scenario simulation with optional simulation components.
+        
+        Args:
+            order_simulation: OrderSimulation instance
+            inventory_simulation: InventorySimulation instance
+            delivery_simulation: DeliverySimulation instance
+        """
+        self.order_simulation = order_simulation or OrderSimulation()
+        self.inventory_simulation = inventory_simulation or InventorySimulation()
+        self.delivery_simulation = delivery_simulation or DeliverySimulation()
+    
+    def run_scenario(self, scenario_name: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Run a predefined scenario simulation.
+        
+        Args:
+            scenario_name: Name of scenario to run
+            config: Additional configuration to override defaults
+            
+        Returns:
+            Dictionary with simulation results
+        """
+        config = config or {}
+        return run_scenario(scenario_name, config)
+    
+    def create_and_run_custom_scenario(self, scenario_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create and run a custom scenario.
+        
+        Args:
+            scenario_config: Configuration for the custom scenario
+            
+        Returns:
+            Dictionary with scenario results
+        """
+        # Extract scenario metadata
+        name = scenario_config.get("name", f"custom_scenario_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
+        description = scenario_config.get("description", "Custom scenario")
+        
+        # Create the scenario
+        create_result = create_custom_scenario(name, description, scenario_config)
+        
+        if create_result["status"] != "success":
+            return create_result
+        
+        # Run the scenario
+        return self.run_scenario(name, {})
+
 
 def create_custom_scenario(name: str, description: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """

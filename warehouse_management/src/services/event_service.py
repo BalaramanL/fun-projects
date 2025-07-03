@@ -17,7 +17,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field, validator
 
-from src.models.database import Order, Inventory, Delivery, SystemEvent
+from src.models.order import Order
+from src.models.inventory import Inventory
+from src.models.delivery import Delivery
+from src.models.events import SystemEvent
 from src.utils.helpers import get_db_session
 
 logger = logging.getLogger(__name__)

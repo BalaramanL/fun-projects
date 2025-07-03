@@ -4,9 +4,9 @@ Defines SQLAlchemy ORM model and Pydantic validation models.
 """
 import uuid
 from typing import Optional, List
-from datetime import time
+from datetime import time, datetime
 
-from sqlalchemy import Column, String, Float, Integer, Time
+from sqlalchemy import Column, String, Float, Integer, Time, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from pydantic import BaseModel, Field, validator, confloat
@@ -19,21 +19,26 @@ class Warehouse(Base):
     """
     __tablename__ = "warehouses"
     
-    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    warehouse_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, index=True, nullable=False)
-    area = Column(String, index=True, nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    capacity = Column(Integer, nullable=False)  # in cubic meters
-    current_staff = Column(Integer, nullable=False)
-    opening_time = Column(Time, nullable=False)
-    closing_time = Column(Time, nullable=False)
+    address = Column(String, nullable=False)
+    city = Column(String, nullable=False)
+    state = Column(String, nullable=False)
+    pincode = Column(String, nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    capacity_sqm = Column(Float, nullable=False)
+    refrigerated_capacity_sqm = Column(Float, nullable=True)
+    operational_hours = Column(String, nullable=True)
+    manager_name = Column(String, nullable=True)
+    contact_number = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
     
-    # Add spatial column for location
-    location = Column(Geometry(geometry_type='POINT', srid=4326))
+    # Location is represented by latitude and longitude fields
     
     def __repr__(self) -> str:
-        return f"<Warehouse(id={self.id}, name={self.name}, area={self.area})>"
+        return f"<Warehouse(warehouse_id={self.warehouse_id}, name={self.name}, address={self.address})>"
 
 
 class WarehouseBase(BaseModel):
@@ -41,33 +46,30 @@ class WarehouseBase(BaseModel):
     Base Pydantic model for warehouse data validation.
     """
     name: str
-    area: str
-    latitude: float = Field(ge=-90, le=90)
-    longitude: float = Field(ge=-180, le=180)
-    capacity: int = Field(gt=0)
-    current_staff: int = Field(ge=0)
-    opening_time: time
-    closing_time: time
+    address: str
+    city: str
+    state: str
+    pincode: str
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    capacity_sqm: float = Field(gt=0)
+    refrigerated_capacity_sqm: Optional[float] = None
+    operational_hours: Optional[str] = None
+    manager_name: Optional[str] = None
+    contact_number: Optional[str] = None
     
-    @validator('capacity')
-    def capacity_must_be_positive(cls, v: int) -> int:
+    @validator('capacity_sqm')
+    def capacity_must_be_positive(cls, v: float) -> float:
         """Validate that capacity is positive."""
         if v <= 0:
             raise ValueError('Capacity must be positive')
         return v
     
-    @validator('current_staff')
-    def staff_must_be_non_negative(cls, v: int) -> int:
-        """Validate that staff count is non-negative."""
-        if v < 0:
-            raise ValueError('Staff count must be non-negative')
-        return v
-    
-    @validator('closing_time')
-    def closing_after_opening(cls, v: time, values: dict) -> time:
-        """Validate that closing time is after opening time."""
-        if 'opening_time' in values and v <= values['opening_time']:
-            raise ValueError('Closing time must be after opening time')
+    @validator('refrigerated_capacity_sqm')
+    def refrigerated_capacity_must_be_non_negative(cls, v: Optional[float]) -> Optional[float]:
+        """Validate that refrigerated capacity is non-negative."""
+        if v is not None and v < 0:
+            raise ValueError('Refrigerated capacity must be non-negative')
         return v
 
 
@@ -83,26 +85,30 @@ class WarehouseUpdate(BaseModel):
     Pydantic model for updating an existing warehouse.
     """
     name: Optional[str] = None
-    area: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
     latitude: Optional[confloat(ge=-90, le=90)] = None
     longitude: Optional[confloat(ge=-180, le=180)] = None
-    capacity: Optional[int] = None
-    current_staff: Optional[int] = None
-    opening_time: Optional[time] = None
-    closing_time: Optional[time] = None
+    capacity_sqm: Optional[float] = None
+    refrigerated_capacity_sqm: Optional[float] = None
+    operational_hours: Optional[str] = None
+    manager_name: Optional[str] = None
+    contact_number: Optional[str] = None
     
-    @validator('capacity')
-    def capacity_must_be_positive(cls, v: Optional[int]) -> Optional[int]:
+    @validator('capacity_sqm')
+    def capacity_must_be_positive(cls, v: Optional[float]) -> Optional[float]:
         """Validate that capacity is positive if provided."""
         if v is not None and v <= 0:
             raise ValueError('Capacity must be positive')
         return v
     
-    @validator('current_staff')
-    def staff_must_be_non_negative(cls, v: Optional[int]) -> Optional[int]:
-        """Validate that staff count is non-negative if provided."""
+    @validator('refrigerated_capacity_sqm')
+    def refrigerated_capacity_must_be_non_negative(cls, v: Optional[float]) -> Optional[float]:
+        """Validate that refrigerated capacity is non-negative if provided."""
         if v is not None and v < 0:
-            raise ValueError('Staff count must be non-negative')
+            raise ValueError('Refrigerated capacity must be non-negative')
         return v
 
 
@@ -110,10 +116,12 @@ class WarehouseResponse(WarehouseBase):
     """
     Pydantic model for warehouse response.
     """
-    id: str
+    warehouse_id: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WarehouseDistance(BaseModel):

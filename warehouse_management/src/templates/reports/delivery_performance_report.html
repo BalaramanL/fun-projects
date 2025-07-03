@@ -1,0 +1,36 @@
+{% extends "reports/generic_report.html" %}
+
+{% block additional_content %}
+<div class="section">
+    <h2>Delivery Time Distribution</h2>
+    <div class="chart-container">
+        {% if charts and charts.distribution %}
+        <img src="{{ charts.distribution }}" alt="Delivery Time Distribution Chart">
+        {% else %}
+        <p>No delivery time distribution chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>On-Time Delivery Rate</h2>
+    <div class="chart-container">
+        {% if charts and charts.pie %}
+        <img src="{{ charts.pie }}" alt="On-Time Delivery Rate Chart">
+        {% else %}
+        <p>No on-time delivery chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Delivery Performance Trend</h2>
+    <div class="chart-container">
+        {% if charts and charts.time_series %}
+        <img src="{{ charts.time_series }}" alt="Delivery Performance Trend Chart">
+        {% else %}
+        <p>No delivery trend chart available</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

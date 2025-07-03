@@ -60,9 +60,9 @@ def populate_inventory(conn):
         
         for product_id in warehouse_products:
             # Generate random inventory data
-            quantity = random.randint(10, 1000)
-            min_threshold = int(quantity * random.uniform(0.1, 0.3))
-            max_threshold = int(quantity * random.uniform(1.2, 2.0))
+            current_stock = random.randint(10, 1000)
+            min_threshold = int(current_stock * random.uniform(0.1, 0.3))
+            max_capacity = int(current_stock * random.uniform(1.2, 2.0))
             
             # Random last restock date within the last 30 days
             days_ago = random.randint(1, 30)
@@ -77,33 +77,64 @@ def populate_inventory(conn):
             inventory_record = {
                 "warehouse_id": warehouse_id,
                 "product_id": product_id,
-                "quantity": quantity,
+                "current_stock": current_stock,
                 "min_threshold": min_threshold,
-                "max_threshold": max_threshold,
-                "last_restock_date": last_restock_date,
-                "last_stockout_date": last_stockout_date
+                "max_capacity": max_capacity,
+                "last_updated": last_restock_date
             }
             
             inventory_records.append(inventory_record)
     
-    # Insert inventory records into the database
+    # Check existing inventory records to avoid unique constraint violations
+    cursor.execute("SELECT warehouse_id, product_id FROM inventory")
+    existing_records = set()
+    for row in cursor.fetchall():
+        existing_records.add((row[0], row[1]))
+    
+    # Insert or update inventory records
+    inserted_count = 0
+    updated_count = 0
+    
     for record in inventory_records:
         try:
-            cursor.execute("""
-                INSERT INTO inventory (
-                    warehouse_id, product_id, quantity, min_threshold, max_threshold,
-                    last_restock_date, last_stockout_date
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                record["warehouse_id"], record["product_id"], record["quantity"],
-                record["min_threshold"], record["max_threshold"],
-                record["last_restock_date"], record["last_stockout_date"]
-            ))
+            # Check if this warehouse-product combination already exists
+            if (record["warehouse_id"], record["product_id"]) in existing_records:
+                # Update existing record
+                cursor.execute("""
+                    UPDATE inventory SET 
+                        current_stock = ?, 
+                        min_threshold = ?, 
+                        max_capacity = ?,
+                        last_updated = ?
+                    WHERE warehouse_id = ? AND product_id = ?
+                """, (
+                    record["current_stock"],
+                    record["min_threshold"],
+                    record["max_capacity"],
+                    record["last_updated"],
+                    record["warehouse_id"], 
+                    record["product_id"]
+                ))
+                updated_count += 1
+            else:
+                # Insert new record
+                cursor.execute("""
+                    INSERT INTO inventory (
+                        warehouse_id, product_id, current_stock, min_threshold, max_capacity,
+                        last_updated
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    record["warehouse_id"], record["product_id"], record["current_stock"],
+                    record["min_threshold"], record["max_capacity"],
+                    record["last_updated"]
+                ))
+                inserted_count += 1
+                existing_records.add((record["warehouse_id"], record["product_id"]))
         except sqlite3.Error as e:
-            logger.error(f"Error inserting inventory record: {e}")
+            logger.error(f"Error managing inventory record: {e}")
     
     conn.commit()
-    logger.info(f"Successfully populated {len(inventory_records)} inventory records")
+    logger.info(f"Successfully processed {len(inventory_records)} inventory records (inserted: {inserted_count}, updated: {updated_count})")
     return True
 
 def main():

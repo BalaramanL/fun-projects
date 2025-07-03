@@ -1,0 +1,36 @@
+{% extends "reports/generic_report.html" %}
+
+{% block additional_content %}
+<div class="section">
+    <h2>Sales Trend</h2>
+    <div class="chart-container">
+        {% if charts and charts.time_series %}
+        <img src="{{ charts.time_series }}" alt="Sales Trend Chart">
+        {% else %}
+        <p>No sales trend chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Top Products</h2>
+    <div class="chart-container">
+        {% if charts and charts.bar %}
+        <img src="{{ charts.bar }}" alt="Top Products Chart">
+        {% else %}
+        <p>No top products chart available</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Sales by Category</h2>
+    <div class="chart-container">
+        {% if charts and charts.pie %}
+        <img src="{{ charts.pie }}" alt="Sales by Category Chart">
+        {% else %}
+        <p>No category sales chart available</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            color: #0066cc;
+        }
+        .header p {
+            margin: 5px 0 0;
+            color: #666;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #0066cc;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .chart-container {
+            margin: 20px 0;
+        }
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .alert-critical {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <p>Generated on: {{ generated_at }}</p>
+            {% if description %}
+            <p>{{ description }}</p>
+            {% endif %}
+        </div>
+
+        {% if summary %}
+        <div class="section">
+            <h2>Summary</h2>
+            <div class="summary-box">
+                {% for key, value in summary.items() %}
+                <p><strong>{{ key }}:</strong> {{ value }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if charts %}
+        <div class="section">
+            <h2>Charts</h2>
+            {% for chart_name, chart_path in charts.items() %}
+            <div class="chart-container">
+                <h3>{{ chart_name|replace('_', ' ')|title }}</h3>
+                <img src="{{ chart_path }}" alt="{{ chart_name }} chart">
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if alerts %}
+        <div class="section">
+            <h2>Alerts</h2>
+            {% for alert in alerts %}
+            <div class="alert alert-{{ alert.level|lower }}">
+                <strong>{{ alert.title }}:</strong> {{ alert.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if items %}
+        <div class="section">
+            <h2>Data</h2>
+            <table>
+                <thead>
+                    <tr>
+                        {% for header in items[0].keys() %}
+                        <th>{{ header|replace('_', ' ')|title }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        {% for value in item.values() %}
+                        <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <p>Warehouse Management System - {{ report_type|replace('_', ' ')|title }} Report</p>
+        </div>
+    </div>
+</body>
+</html>

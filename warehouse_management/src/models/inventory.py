@@ -17,8 +17,9 @@ class Inventory(Base):
     """
     __tablename__ = "inventory"
     
-    warehouse_id = Column(String(36), ForeignKey("warehouses.id", ondelete="CASCADE"), primary_key=True)
-    product_id = Column(String(36), ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    inventory_id = Column(String(36), primary_key=True)
+    warehouse_id = Column(String(36), ForeignKey("warehouses.warehouse_id", ondelete="CASCADE"))
+    product_id = Column(String(36), ForeignKey("products.product_id", ondelete="CASCADE"))
     current_stock = Column(Integer, nullable=False, default=0)
     min_threshold = Column(Integer, nullable=False)
     max_capacity = Column(Integer, nullable=False)
@@ -40,6 +41,7 @@ class InventoryBase(BaseModel):
     """
     Base Pydantic model for inventory data validation.
     """
+    inventory_id: str
     warehouse_id: str
     product_id: str
     current_stock: int = Field(ge=0)
@@ -75,11 +77,43 @@ class InventoryBase(BaseModel):
         return v
 
 
-class InventoryCreate(InventoryBase):
+class InventoryCreate(BaseModel):
     """
     Pydantic model for creating a new inventory record.
     """
-    pass
+    warehouse_id: str
+    product_id: str
+    current_stock: int = Field(ge=0)
+    min_threshold: int = Field(ge=0)
+    max_capacity: int = Field(gt=0)
+    
+    @validator('current_stock')
+    def stock_must_be_non_negative(cls, v: int) -> int:
+        """Validate that stock is non-negative."""
+        if v < 0:
+            raise ValueError('Stock must be non-negative')
+        return v
+    
+    @validator('min_threshold')
+    def threshold_must_be_non_negative(cls, v: int) -> int:
+        """Validate that threshold is non-negative."""
+        if v < 0:
+            raise ValueError('Threshold must be non-negative')
+        return v
+    
+    @validator('max_capacity')
+    def capacity_must_be_positive(cls, v: int) -> int:
+        """Validate that capacity is positive."""
+        if v <= 0:
+            raise ValueError('Capacity must be positive')
+        return v
+    
+    @validator('max_capacity')
+    def capacity_must_exceed_threshold(cls, v: int, values: dict) -> int:
+        """Validate that capacity exceeds threshold."""
+        if 'min_threshold' in values and v <= values['min_threshold']:
+            raise ValueError('Capacity must exceed threshold')
+        return v
 
 
 class InventoryUpdate(BaseModel):
@@ -119,7 +153,7 @@ class InventoryResponse(InventoryBase):
     last_updated: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class InventoryWithDetails(InventoryResponse):

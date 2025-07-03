@@ -11,7 +11,9 @@ import pandas as pd
 import numpy as np
 
 from src.utils.helpers import get_db_session
-from src.models.database import Inventory, Product, Warehouse
+from src.models.inventory import Inventory
+from src.models.product import Product
+from src.models.warehouse import Warehouse
 from src.services.reporting.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -157,14 +159,14 @@ class InventoryReports:
                 query = session.query(
                     Inventory, Product, Warehouse
                 ).join(
-                    Product, Inventory.product_id == Product.id
+                    Product, Inventory.product_id == Product.product_id
                 ).join(
-                    Warehouse, Inventory.warehouse_id == Warehouse.id
+                    Warehouse, Inventory.warehouse_id == Warehouse.warehouse_id
                 )
                 
                 # Apply filters
                 if warehouse_id:
-                    query = query.filter(Warehouse.id == warehouse_id)
+                    query = query.filter(Warehouse.warehouse_id == warehouse_id)
                 
                 if category:
                     query = query.filter(Product.category == category)
@@ -175,11 +177,41 @@ class InventoryReports:
                 # Format results
                 inventory_data = []
                 for inv, product, warehouse in results:
+                    # Skip if any of the objects are None
+                    if inv is None or product is None or warehouse is None:
+                        # Provide more detailed logging about which object is None
+                        if inv is None:
+                            logger.warning(f"Skipping inventory record: Inventory object is None")
+                        if product is None:
+                            logger.warning(f"Skipping inventory record: Product object is None for inventory_id={inv.inventory_id if inv else 'unknown'}")
+                        if warehouse is None:
+                            logger.warning(f"Skipping inventory record: Warehouse object is None for inventory_id={inv.inventory_id if inv else 'unknown'}")
+                        continue
+                    
+                    # Additional validation for required fields
+                    try:
+                        # Verify all required attributes exist before using them
+                        _ = inv.inventory_id
+                        _ = inv.product_id
+                        _ = inv.warehouse_id
+                        _ = inv.current_stock
+                        _ = inv.min_threshold
+                        _ = inv.max_capacity
+                        _ = product.product_id
+                        _ = product.name
+                        _ = product.category
+                        _ = product.price
+                        _ = warehouse.warehouse_id
+                        _ = warehouse.name
+                    except AttributeError as e:
+                        logger.warning(f"Skipping inventory record due to missing attribute: {str(e)} for inventory_id={inv.inventory_id}")
+                        continue
+                    
                     inventory_data.append({
-                        "inventory_id": inv.id,
-                        "warehouse_id": warehouse.id,
+                        "inventory_id": inv.inventory_id,
+                        "warehouse_id": warehouse.warehouse_id,
                         "warehouse_name": warehouse.name,
-                        "product_id": product.id,
+                        "product_id": product.product_id,
                         "product_name": product.name,
                         "category": product.category,
                         "current_stock": inv.current_stock,

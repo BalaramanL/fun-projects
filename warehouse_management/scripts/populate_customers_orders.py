@@ -56,7 +56,7 @@ def get_products_by_warehouse(conn, warehouse_id):
         SELECT p.product_id, p.price 
         FROM products p
         JOIN inventory i ON p.product_id = i.product_id
-        WHERE i.warehouse_id = ? AND i.quantity > 0
+        WHERE i.warehouse_id = ? AND i.current_stock > 0
     """, (warehouse_id,))
     return cursor.fetchall()
 
@@ -114,7 +114,7 @@ def populate_customers(conn, num_customers=50):
     
     conn.commit()
     logger.info(f"Successfully populated {len(customers)} customers")
-    return customers
+    return True
 
 def populate_orders(conn, num_orders=200):
     """Populate the orders and order_items tables with sample data."""
@@ -174,12 +174,14 @@ def populate_orders(conn, num_orders=200):
             "customer_id": customer_id,
             "warehouse_id": warehouse_id,
             "order_date": order_date,
-            "delivery_address": f"Customer Address for {customer_id}",
-            "delivery_pincode": customer_pincode,
+            "shipping_address": f"Customer Address for {customer_id}",
+            "shipping_pincode": customer_pincode,
+            "delivery_address": f"Delivery Address for {customer_id}",
             "delivery_latitude": customer_lat,
             "delivery_longitude": customer_lng,
             "status": status,
-            "payment_method": payment_method
+            "payment_method": payment_method,
+            "total_amount": 0
         }
         
         orders.append(order)
@@ -203,6 +205,7 @@ def populate_orders(conn, num_orders=200):
             total_amount += total_price
             
             order_item = {
+                "item_id": str(uuid.uuid4()),
                 "order_id": order_id,
                 "product_id": product_id,
                 "quantity": quantity,
@@ -220,14 +223,14 @@ def populate_orders(conn, num_orders=200):
         try:
             cursor.execute("""
                 INSERT INTO orders (
-                    order_id, customer_id, warehouse_id, order_date, delivery_address,
-                    delivery_pincode, delivery_latitude, delivery_longitude,
+                    order_id, customer_id, warehouse_id, order_date, shipping_address,
+                    shipping_pincode, delivery_address, delivery_latitude, delivery_longitude,
                     total_amount, status, payment_method
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 order["order_id"], order["customer_id"], order["warehouse_id"],
-                order["order_date"], order["delivery_address"], order["delivery_pincode"],
-                order["delivery_latitude"], order["delivery_longitude"],
+                order["order_date"], order["shipping_address"], order["shipping_pincode"],
+                order["delivery_address"], order["delivery_latitude"], order["delivery_longitude"],
                 order["total_amount"], order["status"], order["payment_method"]
             ))
         except sqlite3.Error as e:
@@ -238,10 +241,10 @@ def populate_orders(conn, num_orders=200):
         try:
             cursor.execute("""
                 INSERT INTO order_items (
-                    order_id, product_id, quantity, unit_price, total_price
-                ) VALUES (?, ?, ?, ?, ?)
+                    item_id, order_id, product_id, quantity, unit_price, total_price
+                ) VALUES (?, ?, ?, ?, ?, ?)
             """, (
-                item["order_id"], item["product_id"], item["quantity"],
+                item["item_id"], item["order_id"], item["product_id"], item["quantity"],
                 item["unit_price"], item["total_price"]
             ))
         except sqlite3.Error as e:
@@ -270,14 +273,14 @@ def main():
     
     try:
         # Populate customers
-        customers = populate_customers(conn)
-        if not customers:
+        success_customers = populate_customers(conn)
+        if not success_customers:
             logger.error("Customer population failed")
             return 1
         
         # Populate orders
-        success = populate_orders(conn)
-        if success:
+        success_orders = populate_orders(conn)
+        if success_orders:
             logger.info("Customer and order population completed successfully")
             return 0
         else:

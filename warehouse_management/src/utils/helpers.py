@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Tuple, Optional, Union
 from datetime import datetime, timedelta, date
 import json
 import csv
+import sys
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,42 @@ from src.config.constants import (
     BANGALORE_BOUNDS, HOURLY_DEMAND_PATTERNS,
     DAILY_DEMAND_PATTERNS, MONTHLY_DEMAND_PATTERNS
 )
+from src.models.database import engine
+
+def setup_logging(log_level=None, log_file=None):
+    """
+    Set up logging configuration for the warehouse management system.
+    
+    Args:
+        log_level: Optional log level (default: INFO)
+        log_file: Optional log file path
+    """
+    # Try to import from settings, but have fallbacks if that fails
+    try:
+        from src.config.settings import LOG_LEVEL, LOG_PATH
+        level = log_level or LOG_LEVEL
+        file_path = log_file or LOG_PATH
+    except ImportError:
+        level = log_level or 'INFO'
+        file_path = log_file or os.path.join('outputs', 'logs', 'warehouse_management.log')
+    
+    # Create logs directory if it doesn't exist
+    if file_path:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    # Configure logging
+    handlers = [logging.StreamHandler(sys.stdout)]
+    if file_path:
+        handlers.append(logging.FileHandler(file_path))
+    
+    logging.basicConfig(
+        level=getattr(logging, level) if hasattr(logging, level) else logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+    
+    # Return the root logger
+    return logging.getLogger()
 
 logger = logging.getLogger(__name__)
 
@@ -250,3 +287,12 @@ def get_recommendation(alert_level: str, product_name: str, warehouse_name: str)
         return f"Consider redistributing excess {product_name} from {warehouse_name} to other warehouses"
     else:
         return "No action required"
+
+def get_db_session() -> Session:
+    """
+    Get a SQLAlchemy database session.
+    
+    Returns:
+        SQLAlchemy Session object
+    """
+    return Session(engine)
