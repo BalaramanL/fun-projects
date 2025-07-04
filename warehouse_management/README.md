@@ -1,6 +1,6 @@
-# Warehouse Management System for BlinkIt
+# Warehouse Management System (Proof of Concept)
 
-A comprehensive warehouse management system focused on Bangalore operations for BlinkIt grocery delivery service. This system demonstrates intelligent warehouse management with real-time analytics, predictive alerts, and optimization algorithms.
+A comprehensive warehouse management system for optimizing inventory, delivery, and warehouse operations. This proof of concept demonstrates intelligent warehouse management with real-time analytics, predictive alerts, and optimization algorithms. It can be applied to various retail and delivery operations (such as online grocery services like BlinkIt) and customized for different locations (such as Bangalore or any other region).
 
 ## Features
 
@@ -102,15 +102,32 @@ The Docker container will automatically:
 
 This provides a complete end-to-end demonstration of the warehouse management system without requiring any manual setup.
 
+### Cleaning and Verifying Outputs
+
+To ensure clean test runs, you can use the provided cleaning and verification scripts:
+
+```bash
+# Clean all output directories before a fresh run
+python scripts/clean_outputs.py
+
+# Run the Docker container
+docker run -v $(pwd)/data:/app/data -v $(pwd)/outputs:/app/outputs warehouse-management
+
+# Verify the generated outputs
+python scripts/verify_outputs.py
+```
+
+**Note:** The current version of the analytics HTML reports may contain zeros or "Not Available" values in some cases. This is expected in the proof of concept stage and will be improved in future iterations with more comprehensive sample data.
+
 ## Database Schema
 
 The system uses SQLite with spatial extensions and includes the following core tables:
 
 - **products**: Product catalog with categories and attributes
-- **warehouses**: Warehouse locations across Bangalore
+- **warehouses**: Warehouse locations (sample data includes locations like Bangalore)
 - **inventory**: Current stock levels across warehouses
 - **purchase_events**: Historical and live purchase data
-- **pincode_mapping**: Bangalore area mapping with coordinates
+- **pincode_mapping**: Area mapping with coordinates (sample data includes regions like Bangalore)
 
 ## Demo Scenarios
 
@@ -136,3 +153,44 @@ Reports can be generated in multiple formats:
 - JSON (for data interchange)
 - CSV (for spreadsheet analysis)
 - PDF (for printing and distribution)
+
+### Generated Outputs
+
+After running the Docker container or the local workflow, the following outputs are generated in the `outputs` directory:
+
+```
+outputs/
+├── charts/              # Generated chart images used in reports
+├── data/                # Exported data files in various formats
+├── logs/                # System and application logs
+├── plots/               # Statistical plots and visualizations
+└── reports/             # Generated HTML and other format reports
+    ├── delivery/        # Delivery performance reports
+    ├── inventory/       # Inventory status and alerts
+    ├── order/           # Order summaries and sales reports
+    └── performance/     # Warehouse and system performance
+```
+
+#### Key Reports and Analytics
+
+1. **Inventory Analytics**
+   - Current stock levels across warehouses
+   - Low stock alerts with threshold indicators
+   - Stock turnover rates and reorder suggestions
+
+2. **Order Analytics**
+   - Order volume by time period and location
+   - Sales performance by product category
+   - Order fulfillment rates and processing times
+
+3. **Delivery Analytics**
+   - Delivery time performance against targets
+   - Delivery agent efficiency metrics
+   - Geographical delivery coverage and hotspots
+
+4. **Warehouse Performance**
+   - Warehouse utilization rates
+   - Processing efficiency metrics
+   - Resource allocation recommendations
+
+**Note:** In the current proof of concept stage, some reports may show placeholder values (zeros or "Not Available"). This is expected and will be improved in future iterations with more comprehensive sample data generation.
