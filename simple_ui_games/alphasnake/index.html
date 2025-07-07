@@ -2,46 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AlphaSnake - Learn Your ABCs!</title>
     <style>
         body {
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            box-sizing: border-box;
         }
 
         .title {
-            font-size: 3em;
+            font-size: clamp(1.5em, 5vw, 3em);
             color: #fff;
             text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             text-align: center;
         }
 
         .game-container {
             background: #fff;
             border-radius: 15px;
-            padding: 20px;
+            padding: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative;
+            max-width: 100vw;
+            box-sizing: border-box;
         }
 
         canvas {
             border: 5px solid #333;
             border-radius: 10px;
             display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
         }
 
         .score-container {
             text-align: center;
             margin-top: 15px;
-            font-size: 1.2em;
+            font-size: clamp(0.9em, 3vw, 1.2em);
             color: #333;
         }
 
@@ -49,6 +55,103 @@
             text-align: center;
             margin-top: 10px;
             color: #666;
+            font-size: clamp(0.8em, 2.5vw, 1em);
+        }
+
+        .touch-controls {
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 240px;
+            margin: 20px auto;
+        }
+
+        .touch-btn {
+            background: rgba(76, 175, 80, 0.85);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em;
+            padding: 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            touch-action: manipulation;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .touch-btn:active {
+            background: #45a049;
+            transform: scale(0.9);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .touch-btn:nth-child(1) { grid-column: 2; grid-row: 1; } /* Up */
+        .touch-btn:nth-child(2) { grid-column: 1; grid-row: 2; } /* Left */
+        .touch-btn:nth-child(3) { grid-column: 2; grid-row: 2; } /* Down */
+        .touch-btn:nth-child(4) { grid-column: 3; grid-row: 2; } /* Right */
+
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+                overflow-x: hidden;
+            }
+            
+            .game-container {
+                padding: 10px;
+                margin: 0 auto;
+                width: fit-content;
+                max-width: calc(100vw - 20px);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .touch-controls {
+                display: grid;
+            }
+            
+            .controls {
+                display: none;
+            }
+
+            .title {
+                font-size: clamp(1.2em, 7vw, 2em);
+                margin: 5px 0;
+            }
+
+            .difficulty-container {
+                padding: 10px;
+                margin-top: 10px;
+            }
+
+            .difficulty-slider {
+                width: 80vw;
+                max-width: 280px;
+            }
+
+            .game-over {
+                padding: 15px;
+            }
+
+            .restart-btn {
+                padding: 12px 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 8px;
+            }
+
+            canvas {
+                border-width: 3px;
+            }
         }
 
         .difficulty-container {
@@ -172,6 +275,12 @@
         <div class="controls">
             Use Arrow Keys or WASD to move • Collect letters A-Z in order!
         </div>
+        <div class="touch-controls" id="touchControls">
+            <button class="touch-btn" data-direction="up">⬆️</button>
+            <button class="touch-btn" data-direction="left">⬅️</button>
+            <button class="touch-btn" data-direction="down">⬇️</button>
+            <button class="touch-btn" data-direction="right">➡️</button>
+        </div>
         <div class="difficulty-container" id="difficultyContainer">
             <div class="difficulty-label">🎮 Choose Difficulty Level</div>
             <input type="range" id="difficultySlider" class="difficulty-slider" 
@@ -202,9 +311,50 @@
         const difficultyContainer = document.getElementById('difficultyContainer');
 
         // Game settings
-        const GRID_SIZE = 20;
-        const GRID_WIDTH = canvas.width / GRID_SIZE;
-        const GRID_HEIGHT = canvas.height / GRID_SIZE;
+        let GRID_SIZE = 20; // Default grid size, will be adjusted for mobile
+        let CANVAS_WIDTH = 600;
+        let CANVAS_HEIGHT = 400;
+        let GRID_WIDTH = CANVAS_WIDTH / GRID_SIZE;
+        let GRID_HEIGHT = CANVAS_HEIGHT / GRID_SIZE;
+
+        /**
+         * Adjusts canvas size based on screen dimensions
+         * Optimizes the game for both desktop and mobile screens
+         * Recalculates grid dimensions after resizing
+         * Adjusts grid size for better mobile gameplay
+         */
+        function adjustCanvasSize() {
+            if (window.innerWidth <= 768) {
+                // Calculate available width accounting for padding and margins
+                const availableWidth = window.innerWidth - 40; // Body + container padding
+                CANVAS_WIDTH = Math.min(350, availableWidth);
+                CANVAS_HEIGHT = Math.floor(CANVAS_WIDTH * 0.67); // Maintain aspect ratio
+                
+                // Set actual canvas dimensions (for drawing)
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                
+                // Adjust grid size for mobile to ensure playable area
+                // Use smaller grid cells on mobile for more precise movement
+                if (window.innerWidth <= 480) {
+                    GRID_SIZE = 15; // Smaller grid for very small screens
+                } else {
+                    GRID_SIZE = 18; // Slightly smaller grid for medium screens
+                }
+            } else {
+                CANVAS_WIDTH = 600;
+                CANVAS_HEIGHT = 400;
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                GRID_SIZE = 20; // Default grid size for desktop
+            }
+            
+            // Recalculate grid dimensions
+            GRID_WIDTH = Math.floor(CANVAS_WIDTH / GRID_SIZE);
+            GRID_HEIGHT = Math.floor(CANVAS_HEIGHT / GRID_SIZE);
+            
+            console.log(`Canvas resized to ${CANVAS_WIDTH}x${CANVAS_HEIGHT}, Grid size: ${GRID_SIZE}, Grid dimensions: ${GRID_WIDTH}x${GRID_HEIGHT}`);
+        }
 
         // Game state
         let snake = [{x: 10, y: 10}];
@@ -244,49 +394,79 @@
             '#DC143C', '#00CED1'
         ];
 
-        // Audio Context for 8-bit sounds
-        let audioContext;
-        let backgroundMusic;
-
-        // Initialize audio
+        // Audio context
+        let audioContext = null;
+        let audioInitialized = false;
+        
+        // Initialize audio context only when needed
         function initAudio() {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            playBackgroundMusic();
+            if (audioContext === null) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioInitialized = true;
+                    console.log('Audio context initialized');
+                } catch (e) {
+                    console.error('Web Audio API not supported.');
+                }
+            } else if (audioContext.state === 'suspended') {
+                audioContext.resume();
+                console.log('Audio context resumed');
+            }
         }
 
         // 8-bit style background music
+        let bgMusicOscillator = null;
+        let bgMusicGainNode = null;
+        let bgMusicInterval = null;
+        
         function playBackgroundMusic() {
-            const notes = [262, 294, 330, 349, 392, 440, 494, 523]; // C major scale
+            // Make sure audio is initialized
+            initAudio();
+            if (!audioContext) return;
+            
+            // Stop any existing background music
+            stopBackgroundMusic();
+            
+            // Create new audio nodes
+            bgMusicOscillator = audioContext.createOscillator();
+            bgMusicGainNode = audioContext.createGain();
+            
+            bgMusicOscillator.type = 'square';
+            bgMusicOscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+            bgMusicGainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+            
+            bgMusicOscillator.connect(bgMusicGainNode);
+            bgMusicGainNode.connect(audioContext.destination);
+            
+            bgMusicOscillator.start();
+            console.log('Background music started');
+            
+            // Simple melody pattern
+            const notes = [220, 330, 440, 330, 220, 330, 440, 330];
             let noteIndex = 0;
-            let tempo = 0;
-
-            function playNote() {
-                if (!gameRunning) return;
-                
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
-                oscillator.type = 'square';
-                
-                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + 0.3);
-                
-                noteIndex = (noteIndex + 1) % notes.length;
-                tempo++;
-                
-                // Vary the rhythm
-                const delay = tempo % 4 === 0 ? 600 : 300;
-                setTimeout(playNote, delay);
+            
+            // Play melody
+            bgMusicInterval = setInterval(() => {
+                if (bgMusicOscillator && audioContext.state === 'running') {
+                    bgMusicOscillator.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+                    noteIndex = (noteIndex + 1) % notes.length;
+                }
+            }, 500);
+        }
+        
+        // Stop background music
+        function stopBackgroundMusic() {
+            if (bgMusicInterval) {
+                clearInterval(bgMusicInterval);
+                bgMusicInterval = null;
             }
             
-            playNote();
+            if (bgMusicOscillator) {
+                bgMusicOscillator.stop();
+                bgMusicOscillator = null;
+            }
+            
+            console.log('Background music stopped');
         }
 
         // Sound effects
@@ -346,16 +526,40 @@
             });
         }
 
-        // Generate random food position
+        // Generate random food position (avoid edges on easier difficulties)
         function generateFood() {
             let newFood;
+            let margin = 0;
+            
+            // Add margin based on difficulty for easier modes
+            const difficulty = parseInt(document.getElementById('difficultySlider').value);
+            if (difficulty === 1) { // Very Easy
+                margin = 3; // Keep 3 blocks away from edges
+            } else if (difficulty === 2) { // Easy
+                margin = 2; // Keep 2 blocks away from edges
+            } else if (difficulty === 3) { // Medium
+                margin = 1; // Keep 1 block away from edges
+            }
+            
+            // Ensure we have valid grid dimensions
+            const maxX = Math.max(1, GRID_WIDTH - 2 * margin);
+            const maxY = Math.max(1, GRID_HEIGHT - 2 * margin);
+            
             do {
                 newFood = {
-                    x: Math.floor(Math.random() * GRID_WIDTH),
-                    y: Math.floor(Math.random() * GRID_HEIGHT),
+                    x: Math.floor(Math.random() * maxX) + margin,
+                    y: Math.floor(Math.random() * maxY) + margin,
                     letter: String.fromCharCode(65 + Math.min(score, 25)) // Clamp to A-Z range
                 };
+                
+                // Double-check food is within canvas bounds and respects margins
+                newFood.x = Math.min(Math.max(newFood.x, margin), GRID_WIDTH - 1 - margin);
+                newFood.y = Math.min(Math.max(newFood.y, margin), GRID_HEIGHT - 1 - margin);
+                
             } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            
+            // Log food position for debugging
+            console.log(`Generated food at (${newFood.x}, ${newFood.y}) with margin ${margin}`);
             
             return newFood;
         }
@@ -403,6 +607,38 @@
         // Game logic
         function updateGame() {
             if (!gameRunning) return;
+
+            // Process any queued direction changes first
+            if (directionQueue.length > 0) {
+                const nextDir = directionQueue[0];
+                let canChangeDirection = false;
+                
+                switch(nextDir) {
+                    case 'up':
+                        canChangeDirection = direction.y === 0;
+                        if (canChangeDirection) nextDirection = {x: 0, y: -1};
+                        break;
+                    case 'down':
+                        canChangeDirection = direction.y === 0;
+                        if (canChangeDirection) nextDirection = {x: 0, y: 1};
+                        break;
+                    case 'left':
+                        canChangeDirection = direction.x === 0;
+                        if (canChangeDirection) nextDirection = {x: -1, y: 0};
+                        break;
+                    case 'right':
+                        canChangeDirection = direction.x === 0;
+                        if (canChangeDirection) nextDirection = {x: 1, y: 0};
+                        break;
+                }
+                
+                // Remove the processed direction from the queue
+                directionQueue.shift();
+                
+                if (canChangeDirection) {
+                    console.log(`Applied queued direction: ${nextDir}`);
+                }
+            }
 
             // Update direction
             direction = {...nextDirection};
@@ -457,7 +693,15 @@
         function gameOver(won) {
             gameRunning = false;
             gameStarted = false; // Allow difficulty change again
-            clearInterval(gameLoop);
+            
+            // Clear any existing game loop
+            if (gameLoop) {
+                clearInterval(gameLoop);
+                gameLoop = null;
+            }
+            
+            // Stop background music
+            stopBackgroundMusic();
             
             // Re-enable difficulty slider
             difficultyContainer.classList.remove('difficulty-disabled');
@@ -477,58 +721,288 @@
 
         // Restart game
         function restartGame() {
+            // Clear any existing game loop
+            if (gameLoop) {
+                clearInterval(gameLoop);
+                gameLoop = null;
+            }
+            
+            // Stop any existing background music
+            stopBackgroundMusic();
+            
+            // Reset game state
             snake = [{x: 10, y: 10}];
             direction = {x: 1, y: 0};
             nextDirection = {x: 1, y: 0};
+            score = 0; // Reset score before generating food
+            
+            // Clear direction queue to prevent pending inputs from carrying over
+            directionQueue = [];
+            lastDirectionChangeTime = 0;
+            
+            // Get current difficulty setting
+            const difficulty = parseInt(difficultySlider.value);
+            gameSpeed = difficultySettings[difficulty].speed;
+            
+            // Generate new food with reset score
             food = generateFood();
-            score = 0;
             gameRunning = true;
+            gameStarted = true;
             gameOverScreen.style.display = 'none';
             
+            // Make sure UI is updated with the reset score
             updateUI();
             drawGame();
             
-            gameLoop = setInterval(updateGame, gameSpeed);
+            // Start a new game loop with the correct speed after a short delay
+            // This delay helps prevent jittery movement by ensuring clean state
+            setTimeout(() => {
+                if (gameLoop === null) { // Only if not already started
+                    gameLoop = setInterval(updateGame, gameSpeed);
+                    console.log(`Game loop started with speed: ${gameSpeed}ms`);
+                }
+                
+                // Start background music with a slight delay to avoid audio glitches
+                setTimeout(() => {
+                    playBackgroundMusic();
+                }, 100);
+            }, 100);
             
-            if (audioContext) {
-                playBackgroundMusic();
-            }
+            // Log restart for debugging
+            console.log(`Game restarted, score reset to 0, speed set to ${gameSpeed}ms`);
         }
-
+        
         // Handle keyboard input
-        document.addEventListener('keydown', (e) => {
-            if (!gameRunning) return;
+        function handleKeyDown(e) {
+            if (!gameRunning && !e.repeat) {
+                startGame();
+                return;
+            }
             
+            let directionKey = null;
             switch(e.key) {
                 case 'ArrowUp':
                 case 'w':
                 case 'W':
-                    if (direction.y === 0) nextDirection = {x: 0, y: -1};
+                    directionKey = 'up';
                     break;
                 case 'ArrowDown':
                 case 's':
                 case 'S':
-                    if (direction.y === 0) nextDirection = {x: 0, y: 1};
+                    directionKey = 'down';
                     break;
                 case 'ArrowLeft':
                 case 'a':
                 case 'A':
-                    if (direction.x === 0) nextDirection = {x: -1, y: 0};
+                    directionKey = 'left';
                     break;
                 case 'ArrowRight':
                 case 'd':
                 case 'D':
-                    if (direction.x === 0) nextDirection = {x: 1, y: 0};
+                    directionKey = 'right';
                     break;
+            }
+            
+            if (directionKey) {
+                handleDirectionChange(directionKey);
+            }
+        }
+
+        // Handle touch controls
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if we're on a touch device and show controls accordingly
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const touchControls = document.getElementById('touchControls');
+            
+            if (isTouchDevice || window.innerWidth <= 768) {
+                touchControls.style.display = 'grid';
+                document.querySelector('.controls').style.display = 'none';
+            }
+            
+            const touchButtons = document.querySelectorAll('.touch-btn');
+            touchButtons.forEach(btn => {
+                // Use touchstart for immediate response, but prevent multiple triggers
+                let touchStarted = false;
+                
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (!gameRunning) {
+                        startGame(); // Start game on first touch
+                        return;
+                    }
+                    
+                    if (touchStarted) return;
+                    touchStarted = true;
+                    
+                    const dir = e.currentTarget.dataset.direction;
+                    handleDirectionChange(dir);
+                    
+                    // Visual feedback
+                    e.currentTarget.classList.add('active');
+                }, { passive: false });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchStarted = false;
+                    e.currentTarget.classList.remove('active');
+                }, { passive: false });
+                
+                btn.addEventListener('touchcancel', (e) => {
+                    touchStarted = false;
+                    e.currentTarget.classList.remove('active');
+                }, { passive: false });
+                
+                // Fallback for click events (for desktop testing)
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!gameRunning) {
+                        startGame();
+                        return;
+                    }
+                    
+                    const dir = e.currentTarget.dataset.direction;
+                    handleDirectionChange(dir);
+                });
+            });
+            
+            // Add swipe gesture support for mobile
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            let touchEndY = 0;
+            
+            // Prevent scrolling when touching the game area on mobile
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, { passive: false });
+            
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('touchend', (e) => {
+                if (!gameRunning) {
+                    startGame();
+                    return;
+                }
+                
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                
+                // Calculate swipe direction
+                handleSwipe();
+            }, { passive: false });
+            
+            function handleSwipe() {
+                const xDiff = touchStartX - touchEndX;
+                const yDiff = touchStartY - touchEndY;
+                
+                // Require a minimum swipe distance to trigger direction change
+                const minSwipeDistance = 30;
+                
+                if (Math.abs(xDiff) > Math.abs(yDiff)) { // Horizontal swipe
+                    if (Math.abs(xDiff) < minSwipeDistance) return;
+                    
+                    if (xDiff > 0) {
+                        // Swipe left
+                        handleDirectionChange('left');
+                    } else {
+                        // Swipe right
+                        handleDirectionChange('right');
+                    }
+                } else { // Vertical swipe
+                    if (Math.abs(yDiff) < minSwipeDistance) return;
+                    
+                    if (yDiff > 0) {
+                        // Swipe up
+                        handleDirectionChange('up');
+                    } else {
+                        // Swipe down
+                        handleDirectionChange('down');
+                    }
+                }
             }
         });
 
+        // Track the last time a direction change was processed
+        let lastDirectionChangeTime = 0;
+        
+        // Queue to store pending direction changes
+        let directionQueue = [];
+        
+        // Unified direction change handler with improved responsiveness
+        function handleDirectionChange(dir) {
+            // For keyboard controls, use a more responsive approach
+            const now = Date.now();
+            const isTouchEvent = now - lastDirectionChangeTime < 200; // Likely from touch/rapid input
+            
+            // Update last direction change time
+            lastDirectionChangeTime = now;
+            
+            // Process direction change immediately
+            switch(dir) {
+                case 'up':
+                    // Allow direction change regardless of current direction before first food
+                    if (score === 0 || direction.y === 0) {
+                        // Can change immediately
+                        nextDirection = {x: 0, y: -1};
+                        console.log('Direction changed to UP');
+                    } else if (!isTouchEvent) {
+                        // Queue for next valid moment
+                        queueDirectionChange(dir);
+                    }
+                    break;
+                case 'down':
+                    if (score === 0 || direction.y === 0) {
+                        nextDirection = {x: 0, y: 1};
+                        console.log('Direction changed to DOWN');
+                    } else if (!isTouchEvent) {
+                        queueDirectionChange(dir);
+                    }
+                    break;
+                case 'left':
+                    if (score === 0 || direction.x === 0) {
+                        nextDirection = {x: -1, y: 0};
+                        console.log('Direction changed to LEFT');
+                    } else if (!isTouchEvent) {
+                        queueDirectionChange(dir);
+                    }
+                    break;
+                case 'right':
+                    if (score === 0 || direction.x === 0) {
+                        nextDirection = {x: 1, y: 0};
+                        console.log('Direction changed to RIGHT');
+                    } else if (!isTouchEvent) {
+                        queueDirectionChange(dir);
+                    }
+                    break;
+            }
+        }
+        
+        // Helper function to queue direction changes
+        function queueDirectionChange(dir) {
+            // Only queue if it's not already the last queued direction
+            if (directionQueue.length === 0 || directionQueue[directionQueue.length - 1] !== dir) {
+                directionQueue.push(dir);
+                console.log(`Queued direction: ${dir}`);
+            }
+        }
+
         // Initialize game
         function initGame() {
+            adjustCanvasSize(); // Set up responsive canvas
             food = generateFood();
             updateUI();
             updateDifficultyDisplay(); // Initialize difficulty display
             drawGame();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                adjustCanvasSize();
+                drawGame();
+            });
             
             // Start game on first click/key press
             document.addEventListener('click', startGame, {once: true});
@@ -536,16 +1010,42 @@
         }
 
         function startGame() {
+            // Initialize audio with user interaction
             if (!audioContext) {
                 initAudio();
             }
+            
+            // Resume audio context if suspended (important for first play)
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log('Audio context resumed successfully');
+                    // Start background music after audio context is resumed
+                    setTimeout(() => {
+                        playBackgroundMusic();
+                    }, 100);
+                });
+            }
+            
             gameRunning = true;
             gameStarted = true;
             
             // Disable difficulty slider once game starts
             difficultyContainer.classList.add('difficulty-disabled');
             
+            // Start game loop
             gameLoop = setInterval(updateGame, gameSpeed);
+            
+            // Play background music if not already playing
+            if (!bgMusicOscillator) {
+                setTimeout(() => {
+                    playBackgroundMusic();
+                }, 100);
+            }
+            
+            // Add persistent keyboard event listener for direction changes
+            // This is crucial for handling direction changes when opening HTML file directly
+            document.addEventListener('keydown', handleKeyDown);
+            console.log('Keyboard direction controls enabled');
         }
 
         // Start the game
