@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaSnake - Learn Your ABCs!</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .title {
+            font-size: 3em;
+            color: #fff;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .game-container {
+            background: #fff;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        canvas {
+            border: 5px solid #333;
+            border-radius: 10px;
+            display: block;
+        }
+
+        .score-container {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 1.2em;
+            color: #333;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+
+        .difficulty-container {
+            text-align: center;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .difficulty-slider {
+            width: 300px;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            margin: 10px;
+            appearance: none;
+        }
+
+        .difficulty-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .difficulty-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .difficulty-label {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .difficulty-value {
+            font-size: 1em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .difficulty-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        .game-over h2 {
+            margin-top: 0;
+            font-size: 2.5em;
+        }
+
+        .restart-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: #45a049;
+        }
+
+        .next-letter {
+            font-size: 1.5em;
+            margin-top: 10px;
+            color: #444;
+        }
+
+        .rainbow-text {
+            background: linear-gradient(45deg, #ff0000, #ff8c00, #ffd700, #32cd32, #1e90ff, #8a2be2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 3s ease-in-out infinite;
+        }
+
+        @keyframes rainbow {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(180deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="title rainbow-text">🐍 AlphaSnake 🐍</h1>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <div class="score-container">
+            <div>Score: <span id="score">0</span></div>
+            <div class="next-letter">Next Letter: <span id="nextLetter">A</span></div>
+        </div>
+        <div class="controls">
+            Use Arrow Keys or WASD to move • Collect letters A-Z in order!
+        </div>
+        <div class="difficulty-container" id="difficultyContainer">
+            <div class="difficulty-label">🎮 Choose Difficulty Level</div>
+            <input type="range" id="difficultySlider" class="difficulty-slider" 
+                   min="1" max="5" value="2" step="1">
+            <div class="difficulty-value" id="difficultyValue">Hard (Current Speed)</div>
+            <div style="font-size: 0.9em; color: #888; margin-top: 5px;">
+                Speed can only be changed before starting the game
+            </div>
+        </div>
+        <div class="game-over" id="gameOverScreen">
+            <h2 id="gameOverTitle">Game Over!</h2>
+            <p id="gameOverMessage">Try again to collect all letters!</p>
+            <button class="restart-btn" onclick="restartGame()">🔄 Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const nextLetterElement = document.getElementById('nextLetter');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameOverTitle = document.getElementById('gameOverTitle');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        const difficultySlider = document.getElementById('difficultySlider');
+        const difficultyValue = document.getElementById('difficultyValue');
+        const difficultyContainer = document.getElementById('difficultyContainer');
+
+        // Game settings
+        const GRID_SIZE = 20;
+        const GRID_WIDTH = canvas.width / GRID_SIZE;
+        const GRID_HEIGHT = canvas.height / GRID_SIZE;
+
+        // Game state
+        let snake = [{x: 10, y: 10}];
+        let direction = {x: 1, y: 0};
+        let nextDirection = {x: 1, y: 0};
+        let food = {x: 15, y: 10, letter: 'A'};
+        let score = 0;
+        let gameRunning = false;
+        let gameStarted = false;
+        let gameLoop;
+        let gameSpeed = 300; // Default to Easy speed
+
+        // Difficulty settings
+        const difficultySettings = {
+            1: { speed: 600, label: "Very Easy (Slow)" },
+            2: { speed: 450, label: "Easy" },
+            3: { speed: 300, label: "Medium" },
+            4: { speed: 200, label: "Hard" },
+            5: { speed: 150, label: "Very Hard" }
+        };
+
+        // Update difficulty display
+        function updateDifficultyDisplay() {
+            const difficulty = parseInt(difficultySlider.value);
+            const setting = difficultySettings[difficulty];
+            difficultyValue.textContent = setting.label;
+            gameSpeed = setting.speed; // Always update game speed when slider changes
+        }
+
+        // Difficulty slider event listener
+        difficultySlider.addEventListener('input', updateDifficultyDisplay);
+        const COLORS = [
+            '#8B0000', '#006400', '#000080', '#8B008B', '#FF8C00', '#2F4F4F',
+            '#228B22', '#4B0082', '#B22222', '#191970', '#8B4513', '#2E8B57',
+            '#800080', '#556B2F', '#8B0000', '#483D8B', '#B8860B', '#D2691E',
+            '#CD853F', '#4682B4', '#9ACD32', '#32CD32', '#DAA520', '#FF69B4',
+            '#DC143C', '#00CED1'
+        ];
+
+        // Audio Context for 8-bit sounds
+        let audioContext;
+        let backgroundMusic;
+
+        // Initialize audio
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            playBackgroundMusic();
+        }
+
+        // 8-bit style background music
+        function playBackgroundMusic() {
+            const notes = [262, 294, 330, 349, 392, 440, 494, 523]; // C major scale
+            let noteIndex = 0;
+            let tempo = 0;
+
+            function playNote() {
+                if (!gameRunning) return;
+                
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+                oscillator.type = 'square';
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.3);
+                
+                noteIndex = (noteIndex + 1) % notes.length;
+                tempo++;
+                
+                // Vary the rhythm
+                const delay = tempo % 4 === 0 ? 600 : 300;
+                setTimeout(playNote, delay);
+            }
+            
+            playNote();
+        }
+
+        // Sound effects
+        function playWhooshSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.1);
+            oscillator.type = 'sawtooth';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function playDeathSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.5);
+            oscillator.type = 'triangle';
+            
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        function playVictorySound() {
+            const notes = [523, 659, 784, 1047]; // C, E, G, C (victory chord)
+            notes.forEach((freq, i) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.1);
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + i * 0.1);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.1 + 0.5);
+                
+                oscillator.start(audioContext.currentTime + i * 0.1);
+                oscillator.stop(audioContext.currentTime + i * 0.1 + 0.5);
+            });
+        }
+
+        // Generate random food position
+        function generateFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * GRID_WIDTH),
+                    y: Math.floor(Math.random() * GRID_HEIGHT),
+                    letter: String.fromCharCode(65 + Math.min(score, 25)) // Clamp to A-Z range
+                };
+            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            
+            return newFood;
+        }
+
+        // Draw game elements
+        function drawGame() {
+            // Clear canvas
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw snake
+            snake.forEach((segment, index) => {
+                const colorIndex = Math.min(index, COLORS.length - 1);
+                ctx.fillStyle = COLORS[colorIndex];
+                ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+                
+                // Draw letter on snake segment
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const letter = String.fromCharCode(65 + index); // A, B, C, etc.
+                if (index < score) {
+                    ctx.fillText(letter, 
+                        segment.x * GRID_SIZE + GRID_SIZE/2, 
+                        segment.y * GRID_SIZE + GRID_SIZE/2);
+                }
+            });
+
+            // Draw food
+            ctx.fillStyle = COLORS[score % COLORS.length];
+            ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+            
+            // Draw letter on food
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(food.letter, 
+                food.x * GRID_SIZE + GRID_SIZE/2, 
+                food.y * GRID_SIZE + GRID_SIZE/2);
+        }
+
+        // Game logic
+        function updateGame() {
+            if (!gameRunning) return;
+
+            // Update direction
+            direction = {...nextDirection};
+
+            // Calculate new head position
+            const head = {x: snake[0].x + direction.x, y: snake[0].y + direction.y};
+
+            // Check wall collision
+            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
+                gameOver(false);
+                return;
+            }
+
+            // Check self collision
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver(false);
+                return;
+            }
+
+            // Add new head
+            snake.unshift(head);
+
+            // Check food collision
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                playWhooshSound();
+                
+                // Check win condition
+                if (score >= 26) {
+                    gameOver(true);
+                    return;
+                }
+                
+                // Generate new food
+                food = generateFood();
+                updateUI();
+            } else {
+                // Remove tail if no food eaten
+                snake.pop();
+            }
+
+            drawGame();
+        }
+
+        // Update UI elements
+        function updateUI() {
+            scoreElement.textContent = score;
+            nextLetterElement.textContent = String.fromCharCode(65 + score);
+        }
+
+        // Game over
+        function gameOver(won) {
+            gameRunning = false;
+            gameStarted = false; // Allow difficulty change again
+            clearInterval(gameLoop);
+            
+            // Re-enable difficulty slider
+            difficultyContainer.classList.remove('difficulty-disabled');
+            
+            if (won) {
+                gameOverTitle.textContent = '🎉 Congratulations! 🎉';
+                gameOverMessage.textContent = 'You collected all letters from A to Z!';
+                playVictorySound();
+            } else {
+                gameOverTitle.textContent = '💥 Game Over! 💥';
+                gameOverMessage.textContent = `You collected ${score} letters. Try to get all 26!`;
+                playDeathSound();
+            }
+            
+            gameOverScreen.style.display = 'block';
+        }
+
+        // Restart game
+        function restartGame() {
+            snake = [{x: 10, y: 10}];
+            direction = {x: 1, y: 0};
+            nextDirection = {x: 1, y: 0};
+            food = generateFood();
+            score = 0;
+            gameRunning = true;
+            gameOverScreen.style.display = 'none';
+            
+            updateUI();
+            drawGame();
+            
+            gameLoop = setInterval(updateGame, gameSpeed);
+            
+            if (audioContext) {
+                playBackgroundMusic();
+            }
+        }
+
+        // Handle keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    if (direction.y === 0) nextDirection = {x: 0, y: -1};
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    if (direction.y === 0) nextDirection = {x: 0, y: 1};
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    if (direction.x === 0) nextDirection = {x: -1, y: 0};
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    if (direction.x === 0) nextDirection = {x: 1, y: 0};
+                    break;
+            }
+        });
+
+        // Initialize game
+        function initGame() {
+            food = generateFood();
+            updateUI();
+            updateDifficultyDisplay(); // Initialize difficulty display
+            drawGame();
+            
+            // Start game on first click/key press
+            document.addEventListener('click', startGame, {once: true});
+            document.addEventListener('keydown', startGame, {once: true});
+        }
+
+        function startGame() {
+            if (!audioContext) {
+                initAudio();
+            }
+            gameRunning = true;
+            gameStarted = true;
+            
+            // Disable difficulty slider once game starts
+            difficultyContainer.classList.add('difficulty-disabled');
+            
+            gameLoop = setInterval(updateGame, gameSpeed);
+        }
+
+        // Start the game
+        initGame();
+    </script>
+</body>
+</html>
