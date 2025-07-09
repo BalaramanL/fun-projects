@@ -2,7 +2,7 @@
 
 AlphaSnake is a modern, responsive implementation of the classic Snake game with an educational twist - players must collect letters of the alphabet in order from A to Z.
 
-![AlphaSnake Game](https://github.com/BalaramanL/fun-projects/blob/main/simple_ui_games/alphasnake/screenshot.png)
+**Try it out:** [Play AlphaSnake Online](https://alpha-snake.netlify.app/)
 
 ## Features
 
