@@ -43,6 +43,8 @@ interface GameState {
   lastWordFormed: string | null;
 }
 
+type WordValidationPayload = string | { word: string; startIndex: number; endIndex: number };
+
 type GameAction = 
   | { type: 'MOVE_SNAKE' }
   | { type: 'SET_DIRECTION'; payload: Direction }
@@ -50,9 +52,10 @@ type GameAction =
   | { type: 'GAME_OVER' }
   | { type: 'UPDATE_TIME'; payload: number }
   | { type: 'CONSUME_FOOD'; payload: Food }
-  | { type: 'VALIDATE_WORD'; payload: string }
+  | { type: 'VALIDATE_WORD'; payload: WordValidationPayload }
   | { type: 'START_GAME' }
   | { type: 'UPDATE_COUNTDOWN'; payload: number }
+  | { type: 'RESET_GAME' };
 
 const initialState: GameState = {
   snake: [{ x: 10, y: 10 }],
@@ -154,17 +157,56 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
     
     case 'VALIDATE_WORD': {
-      const word = action.payload;
+      // Handle both string and object payload formats
+      let word: string;
+      let startIndex = 0;
+      let endIndex: number;
+      
+      if (typeof action.payload === 'string') {
+        // Old format: just the word
+        word = action.payload;
+        endIndex = state.collectedLetters.length - 1;
+      } else {
+        // New format: object with word and indices
+        word = action.payload.word;
+        startIndex = action.payload.startIndex;
+        endIndex = action.payload.endIndex;
+      }
+      
       const newScore = state.score + word.length;
       const newWordsCollected = state.wordsCollected + 1;
-      const newSnake = state.snake.slice(0, state.snake.length - word.length);
       
-      // Create a visual effect for the word that was formed
+      // Create a new snake without the segments that formed the word
+      let newSnake = [...state.snake];
+      const segmentsToRemove = endIndex - startIndex + 1;
+      
+      // Remove segments from the snake
+      // For words at the beginning of the snake, we keep the head and remove from the end
+      // For words in the middle or end, we remove the specific segments
+      if (startIndex === 0) {
+        // Word at the beginning - remove from end as before
+        newSnake = newSnake.slice(0, newSnake.length - segmentsToRemove);
+      } else {
+        // Word in the middle or end - remove specific segments
+        // We need to keep the segments before startIndex and after endIndex
+        // +1 to account for the head which isn't part of collectedLetters
+        const actualStartIndex = startIndex + 1;
+        const actualEndIndex = endIndex + 1;
+        newSnake = [
+          ...newSnake.slice(0, actualStartIndex),
+          ...newSnake.slice(actualEndIndex + 1)
+        ];
+      }
+      
+      // Update collected letters - remove the ones that formed the word
+      let newCollectedLetters = [...state.collectedLetters];
+      newCollectedLetters.splice(startIndex, segmentsToRemove);
+      
       return { 
         ...state, 
         score: newScore, 
         wordsCollected: newWordsCollected,
-        collectedLetters: [], 
+        collectedLetters: newCollectedLetters, 
         snake: newSnake,
         lastWordFormed: word
       };
@@ -175,6 +217,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
     case 'UPDATE_TIME':
       return { ...state, gameTime: state.gameTime + action.payload };
+    
+    case 'RESET_GAME':
+      return {
+        ...initialState,
+        isGameStarted: true,  // Start the game immediately
+        countdownValue: 3     // Start with countdown
+      };
       
     default:
       return state;
@@ -290,11 +339,24 @@ const GameBoard: React.FC = () => {
       return;
     }
 
-    // Check if we have a valid word
+    // Check if we have valid words anywhere in the snake
     if (state.collectedLetters.length >= 3) {
-      const word = state.collectedLetters.join('').toLowerCase();
-      if (wordValidator && wordValidator.isValidWord(word)) {
-        dispatch({ type: 'VALIDATE_WORD', payload: word });
+      // First check the entire string as before
+      const fullWord = state.collectedLetters.join('').toLowerCase();
+      if (wordValidator && wordValidator.isValidWord(fullWord)) {
+        dispatch({ type: 'VALIDATE_WORD', payload: fullWord });
+        return;
+      }
+      
+      // Then check for valid words of at least 3 letters anywhere in the string
+      for (let startIdx = 0; startIdx < state.collectedLetters.length - 2; startIdx++) {
+        for (let endIdx = startIdx + 2; endIdx < state.collectedLetters.length; endIdx++) {
+          const subWord = state.collectedLetters.slice(startIdx, endIdx + 1).join('').toLowerCase();
+          if (wordValidator && wordValidator.isValidWord(subWord)) {
+            dispatch({ type: 'VALIDATE_WORD', payload: { word: subWord, startIndex: startIdx, endIndex: endIdx } });
+            return;
+          }
+        }
       }
     }
   }, [state, wordValidator]);
@@ -305,13 +367,19 @@ const GameBoard: React.FC = () => {
   // Spawn food on interval
   useEffect(() => {
     if (state.isGameOver || !state.isGameStarted || state.countdownValue > 0) return;
+    
+    // Only spawn food if we're below the maximum
+    if (state.foods.length >= GAME_CONFIG.MAX_FOODS_ON_SCREEN) return;
 
     const foodInterval = setInterval(() => {
-      dispatch({ type: 'SPAWN_FOOD' });
+      // Double-check we're still below the max before dispatching
+      if (state.foods.length < GAME_CONFIG.MAX_FOODS_ON_SCREEN) {
+        dispatch({ type: 'SPAWN_FOOD' });
+      }
     }, GAME_CONFIG.FOOD_SPAWN_INTERVAL);
 
     return () => clearInterval(foodInterval);
-  }, [state.isGameOver, state.isGameStarted, state.countdownValue]);
+  }, [state.isGameOver, state.isGameStarted, state.countdownValue, state.foods.length]);
 
   // Update game time
   useEffect(() => {
@@ -407,7 +475,7 @@ const GameBoard: React.FC = () => {
         </div>
       )}
       
-      <ControlPanel isGameOver={state.isGameOver} onRestart={() => window.location.reload()} />
+      <ControlPanel isGameOver={state.isGameOver} onRestart={() => dispatch({ type: 'RESET_GAME' })} />
     </div>
   );
 };
