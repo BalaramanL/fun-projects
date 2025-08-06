@@ -59,18 +59,19 @@ const GameBoard: React.FC = () => {
   // Generate food at regular intervals
   // Food spawn timer
   useEffect(() => {
-    // Don't spawn food if game is paused, countdown is active, or game is over
     if (state.isPaused || state.countdownActive || state.gameOver || !state.isGameStarted) return;
     
-    console.log('Food spawn timer started');
-    
-    // Create a food spawn timer that runs every 5 seconds
     const foodInterval = setInterval(() => {
-      console.log('Food spawn interval triggered, current foods:', state.foods.length);
+      if (!state.isPaused && !state.countdownActive && !state.gameOver) {
+        console.log(`Food spawn interval triggered, current foods: ${state.foods.length}`);
       
       // Only spawn food if we haven't reached the maximum
-      if (state.foods.length < GAME_CONFIG.MAX_FOODS_ON_SCREEN) {
-        console.log('Spawning new food');
+      if (state.foods.length >= GAME_CONFIG.MAX_FOODS_ON_SCREEN) {
+        console.log(`Maximum food limit reached (${GAME_CONFIG.MAX_FOODS_ON_SCREEN}). Skipping food spawn.`);
+        return; // Skip spawning if we've reached the limit
+      }
+      
+      console.log('Spawning new food');
         
         // Get all occupied positions to prevent spawning on snake
         const occupiedPositions = [
@@ -98,14 +99,24 @@ const GameBoard: React.FC = () => {
           allOccupied
         );
         
-        // Check current vowel ratio to enforce at least 1 vowel per 4 letters
+        // Check current vowel ratio to enforce better vowel distribution
         const currentFoods = state.foods.map(food => food.letter);
         const allLetters = [...currentFoods, ...state.collectedLetters];
         const vowelCount = allLetters.filter(letter => /[aeiou]/i.test(letter)).length;
         const totalCount = allLetters.length;
         
-        // Force a vowel if we don't have enough vowels (at least 1 per 4 letters)
-        const forceVowel = totalCount >= 3 && vowelCount < Math.ceil(totalCount / 4);
+        // Improved vowel distribution logic:
+        // 1. Always ensure at least 25% vowels (1 in 4)
+        // 2. If snake has 3+ letters, ensure at least 30% vowels
+        // 3. If no vowels in current foods, force a vowel
+        const minVowelRatio = state.snake.length >= 3 ? 0.3 : 0.25;
+        const currentVowelRatio = vowelCount / (totalCount || 1);
+        const noVowelsInFoods = !currentFoods.some(letter => /[aeiou]/i.test(letter));
+        
+        // Force a vowel under these conditions
+        const forceVowel = 
+          (totalCount >= 3 && currentVowelRatio < minVowelRatio) || 
+          (currentFoods.length > 0 && noVowelsInFoods);
         
         // Get random letter with vowel enforcement if needed
         const letter = forceVowel ? 
@@ -124,6 +135,11 @@ const GameBoard: React.FC = () => {
     return () => clearInterval(foodInterval);
   }, [state.isPaused, state.countdownActive, state.gameOver, state.isGameStarted]);
 
+  // Debug log for food count
+  useEffect(() => {
+    console.log(`Current food count: ${state.foods.length}/${GAME_CONFIG.MAX_FOODS_ON_SCREEN}`);
+  }, [state.foods.length]);
+  
   // Update game time
   useEffect(() => {
     if (state.isPaused || !state.isGameStarted || state.gameOver || state.countdownActive) return;
@@ -194,10 +210,18 @@ const GameBoard: React.FC = () => {
           const snakeElements = gameAreaRef.current.querySelectorAll('.snake-segment');
           const wordSegments = Array.from(snakeElements).slice(0, length);
           
+          // Apply tetris disappearing animation to segments
           wordSegments.forEach(segment => {
+            // Add the disappearing-word class to trigger the animation
+            segment.classList.add('disappearing-word');
+            
+            // Create particle effect
             const rect = segment.getBoundingClientRect();
             createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 'success');
           });
+          
+          // Play sound effect
+          playSound('wordFormed');
         }
         
         // Process the word
@@ -252,16 +276,19 @@ const GameBoard: React.FC = () => {
   // Game loop for snake movement
   const moveSnake = useCallback(() => {
     dispatch({ type: 'MOVE_SNAKE' });
-  }, []);
+  }, [dispatch]);
 
+  // Main game loop - handles snake movement and collision detection
   useGameLoop(
-    moveSnake,
+    () => {
+      if (state.isPaused || state.countdownActive || state.gameOver || !state.isGameStarted) return;
+      moveSnake();
+    },
     GAME_CONFIG.SNAKE_SPEED,
-    GAME_CONFIG.INITIAL_DELAY,
-    [state.isPaused, state.countdownActive, state.gameOver]
+    0, // Remove initial delay to start moving immediately after countdown
+    [state.isPaused, state.countdownActive, state.gameOver, state.isGameStarted, state.direction]
   );
 
-  // Handle pause/resume
   const handlePauseResume = () => {
     if (state.gameOver) return;
     
@@ -291,6 +318,7 @@ const GameBoard: React.FC = () => {
         const foodItem = state.foods.find(food => food.position.x === x && food.position.y === y);
         
         const cellKey = `cell-${x}-${y}`;
+        // Use CSS grid for exact positioning
         const cellStyle = {
           gridColumnStart: x + 1,
           gridRowStart: y + 1
@@ -314,6 +342,7 @@ const GameBoard: React.FC = () => {
           const isVowel = /[aeiou]/i.test(foodItem.letter);
           
           // Calculate absolute position for food container
+          // Use percentage-based positioning with full size to match snake segments
           const foodContainerStyle = {
             left: `${x * 100 / GAME_CONFIG.GRID_SIZE}%`,
             top: `${y * 100 / GAME_CONFIG.GRID_SIZE}%`,
@@ -381,7 +410,9 @@ const GameBoard: React.FC = () => {
     <div className="game-container">
       {/* Game title - only show when not in rules or countdown */}
       {!showRules && !state.countdownActive && (
-        <h1 className="game-title">WordSnake</h1>
+        <h1 className="game-title">
+          Word<span className="snake-title-highlight">Snake</span>
+        </h1>
       )}
 
       <div 

@@ -24,16 +24,22 @@ jest.mock('../hooks/useGameLoop', () => ({
 describe('Food Rendering', () => {
   // Test for food bubble rendering
   it('should render food bubbles as perfect circles with correct positioning', () => {
-    // Create a custom render function to inspect CSS properties
-    const { container } = render(<GameBoard />);
-    
-    // Simulate adding food to the game
+    // Create a test state with food
     const testState = {
       ...initialGameState,
       foods: [
         { position: { x: 5, y: 5 }, letter: 'A' },
       ],
     };
+    
+    // Mock the useReducer hook to return our test state
+    jest.spyOn(React, 'useReducer').mockImplementation(() => [testState, jest.fn()]);
+    
+    // Render the component
+    const { container } = render(<GameBoard />);
+    
+    // Force a re-render to ensure our mocked state is used
+    const { rerender } = render(<GameBoard />);
     
     // Find food container and food elements
     const foodContainer = container.querySelector('.food-container');

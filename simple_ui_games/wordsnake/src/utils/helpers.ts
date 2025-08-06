@@ -35,13 +35,36 @@ export function getRandomLetter(): string {
   
   // Weight common letters higher for better word formation
   const commonConsonants = ['R', 'S', 'T', 'N', 'L'];
-  const weightedConsonants = [...consonants, ...commonConsonants];
+  const rareConsonants = ['Q', 'X', 'Z', 'J', 'K'];
   
+  // Create a weighted distribution that favors common consonants
+  // and reduces the frequency of rare consonants
+  const weightedConsonants = [
+    ...consonants,           // Base frequency
+    ...commonConsonants,     // Double frequency for common consonants
+    ...commonConsonants,     // Triple frequency for common consonants
+  ].filter(c => !rareConsonants.includes(c)); // Remove rare consonants
+  
+  // Add back rare consonants with lower frequency
+  rareConsonants.forEach(c => {
+    if (Math.random() < 0.3) { // Only 30% chance to include rare consonants
+      weightedConsonants.push(c);
+    }
+  });
+  
+  // Increase vowel probability for better word formation
   const isVowel = Math.random() < GAME_CONFIG.VOWEL_PROBABILITY;
   
   if (isVowel) {
-    // Weight common vowels higher
-    const weightedVowels = ['E', 'A', 'E', 'I', 'O', 'E', 'A', 'U'];
+    // Weight common vowels higher for better word formation
+    // E is most common, followed by A, then O, I, U
+    const weightedVowels = [
+      'E', 'E', 'E', 'E',  // E appears 4 times (highest frequency)
+      'A', 'A', 'A',       // A appears 3 times
+      'O', 'O',            // O appears 2 times
+      'I', 'I',            // I appears 2 times
+      'U'                  // U appears 1 time (lowest frequency)
+    ];
     return weightedVowels[Math.floor(Math.random() * weightedVowels.length)];
   } else {
     return weightedConsonants[Math.floor(Math.random() * weightedConsonants.length)];
