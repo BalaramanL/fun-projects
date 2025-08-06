@@ -72,6 +72,8 @@
   grid-template-rows: repeat(20, 1fr);
   border: 2px solid var(--grid-lines);
   aspect-ratio: 1 / 1; /* Ensure it's always square */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .game-board {
@@ -120,6 +122,21 @@
   z-index: 11;
 }
 
+.food-container {
+  position: absolute !important;
+  /* Prevent reflow and repaint */
+  will-change: transform;
+  /* Ensure container doesn't move */
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+  /* Ensure container stays fixed */
+  pointer-events: none;
+  z-index: 5;
+  /* Prevent any layout shifts */
+  contain: layout paint;
+}
+
 .food {
   position: absolute;
   display: flex;
@@ -127,10 +144,15 @@
   justify-content: center;
   font-weight: bold;
   color: white;
-  border-radius: 50%;
+  border-radius: 50% !important; /* Ensure perfect circles */
+  aspect-ratio: 1 / 1;
   background-color: var(--food-letter); /* Red for consonants */
   box-shadow: 0 0 10px rgba(231, 76, 60, 0.8);
   z-index: 5;
+  /* Prevent any movement */
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
   font-size: 12px;
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
   /* Fixed size for perfect circles */
@@ -148,11 +170,23 @@
   left: 50%;
   margin-top: -10px; /* Half of height */
   margin-left: -10px; /* Half of width */
+  /* Prevent any DOM updates from affecting position */
+  contain: layout paint;
 }
 
 .food.vowel {
   background-color: var(--vowel-color);
   box-shadow: 0 0 10px rgba(52, 152, 219, 0.8);
+}
+
+.food.consonant {
+  background-color: var(--food-letter);
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.8);
+  /* Ensure consonants have the same static positioning as vowels */
+  position: absolute;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 .game-info {
@@ -620,20 +654,6 @@
 }
 
 /* Animations */
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
 
 @keyframes fadeIn {
   from { opacity: 0; }

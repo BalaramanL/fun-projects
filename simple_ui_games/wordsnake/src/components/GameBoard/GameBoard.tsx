@@ -313,20 +313,25 @@ const GameBoard: React.FC = () => {
         } else if (foodItem) {
           const isVowel = /[aeiou]/i.test(foodItem.letter);
           
-          // Create a container div with grid positioning for collision detection
-          // and a child div for the food bubble with absolute positioning
-          const containerStyle = {
-            ...cellStyle, // Keep the grid positioning for collision detection
-            position: 'relative' as const, // Needed for absolute positioning of child
+          // Calculate absolute position for food container
+          const foodContainerStyle = {
+            left: `${x * 100 / GAME_CONFIG.GRID_SIZE}%`,
+            top: `${y * 100 / GAME_CONFIG.GRID_SIZE}%`,
+            width: `${100 / GAME_CONFIG.GRID_SIZE}%`,
+            height: `${100 / GAME_CONFIG.GRID_SIZE}%`,
           };
           
           cells.push(
             <div
               key={cellKey}
-              style={containerStyle}
+              className="food-container"
+              style={foodContainerStyle}
+              data-testid={`food-${x}-${y}`}
             >
               <div
-                className={`food ${isVowel ? 'vowel' : ''}`}
+                className={`food ${isVowel ? 'vowel' : 'consonant'}`}
+                style={{ width: '100%', height: '100%' }}
+                data-testid={`food-letter-${foodItem.letter}`}
               >
                 {foodItem.letter}
               </div>
