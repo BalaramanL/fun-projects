@@ -1,6 +1,7 @@
 import requests
 import json
 import re
+import os
 from typing import Set, List
 from datetime import datetime
 
@@ -64,6 +65,11 @@ class DictionaryGenerator:
                 "generated_at": str(datetime.now())
             }
         }
+        
+        # Create directory if it doesn't exist
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
         
         with open(output_path, 'w') as f:
             json.dump(dictionary_data, f, separators=(',', ':'))
