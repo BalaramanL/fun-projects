@@ -387,7 +387,7 @@ const GameBoard: React.FC = () => {
             className="control-btn left" 
             onClick={() => dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.LEFT })}
           >
-            <span style={{ fontSize: '1.2em' }}>◄</span>
+            <span style={{ fontSize: '1.5em' }}>◄</span>
           </button>
           <button 
             className="control-btn right" 
