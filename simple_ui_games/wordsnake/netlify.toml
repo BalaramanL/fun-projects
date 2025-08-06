@@ -1,7 +1,6 @@
-
 [build]
   publish = "dist"
-  command = "npm run build"
+  command = "pip install -r requirements.txt && npm run build"
 
 [build.environment]
   NODE_VERSION = "18"
