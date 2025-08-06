@@ -1,481 +1,470 @@
-
-import React, { useEffect, useReducer, useCallback } from 'react';
-import { GAME_CONFIG, COLORS } from '../../utils/constants';
-import { useGameLoop } from '../../hooks/useGameLoop';
-import { useInput } from '../../hooks/useInput';
-import { useWordValidator } from '../../hooks/useWordValidator';
+import React, { useState, useEffect, useReducer, useRef, useCallback } from 'react';
+import { GAME_CONFIG } from '../../utils/constants';
 import { getRandomPosition, getRandomLetter, createParticles } from '../../utils/helpers';
-import ScoreDisplay from '../ScoreDisplay/ScoreDisplay';
-import ControlPanel from '../ControlPanel/ControlPanel';
+import { useWordValidator } from '../../hooks/useWordValidator';
+import { initAudio, playSound } from '../../utils/soundEffects';
+import { Direction, type GameState, type Food, initialGameState, gameReducer } from './gameState';
+import { useGameLoop } from '../../hooks/useGameLoop';
 import '../../styles/GameStyles.css';
 
-export interface Position {
-  x: number;
-  y: number;
-}
-
-export interface Food {
-  position: Position;
-  letter: string;
-  spawnTime: number;
-}
-
-export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-
-export const Directions = {
-  UP: 'UP' as Direction,
-  DOWN: 'DOWN' as Direction,
-  LEFT: 'LEFT' as Direction,
-  RIGHT: 'RIGHT' as Direction
-};
-
-interface GameState {
-  snake: Position[];
-  foods: Food[];
-  score: number;
-  gameTime: number;
-  isGameOver: boolean;
-  collectedLetters: string[];
-  direction: Direction;
-  wordsCollected: number;
-  isGameStarted: boolean;
-  countdownValue: number;
-  lastWordFormed: string | null;
-}
-
-type WordValidationPayload = string | { word: string; startIndex: number; endIndex: number };
-
-type GameAction = 
-  | { type: 'MOVE_SNAKE' }
-  | { type: 'SET_DIRECTION'; payload: Direction }
-  | { type: 'SPAWN_FOOD' }
-  | { type: 'GAME_OVER' }
-  | { type: 'UPDATE_TIME'; payload: number }
-  | { type: 'CONSUME_FOOD'; payload: Food }
-  | { type: 'VALIDATE_WORD'; payload: WordValidationPayload }
-  | { type: 'START_GAME' }
-  | { type: 'UPDATE_COUNTDOWN'; payload: number }
-  | { type: 'RESET_GAME' };
-
-const initialState: GameState = {
-  snake: [{ x: 10, y: 10 }],
-  foods: [],
-  score: 0,
-  gameTime: 0,
-  isGameOver: false,
-  collectedLetters: [],
-  direction: Directions.RIGHT,
-  wordsCollected: 0,
-  isGameStarted: false,
-  countdownValue: 3,
-  lastWordFormed: null
-};
-
-function gameReducer(state: GameState, action: GameAction): GameState {
-  switch (action.type) {
-    case 'START_GAME':
-      return { ...state, isGameStarted: true };
-      
-    case 'UPDATE_COUNTDOWN':
-      return { ...state, countdownValue: action.payload };
-      
-    case 'SET_DIRECTION':
-      // Prevent snake from reversing
-      if (
-        (action.payload === Directions.UP && state.direction === Directions.DOWN) ||
-        (action.payload === Directions.DOWN && state.direction === Directions.UP) ||
-        (action.payload === Directions.LEFT && state.direction === Directions.RIGHT) ||
-        (action.payload === Directions.RIGHT && state.direction === Directions.LEFT)
-      ) {
-        return state;
-      }
-      return { ...state, direction: action.payload };
-      
-    case 'MOVE_SNAKE': {
-      // Don't move if game hasn't started or is over
-      if (!state.isGameStarted || state.isGameOver || state.countdownValue > 0) {
-        return state;
-      }
-      
-      const newSnake = [...state.snake];
-      const head = { ...newSnake[0] };
-
-      switch (state.direction) {
-        case Directions.UP:
-          head.y -= 1;
-          break;
-        case Directions.DOWN:
-          head.y += 1;
-          break;
-        case Directions.LEFT:
-          head.x -= 1;
-          break;
-        case Directions.RIGHT:
-          head.x += 1;
-          break;
-      }
-
-      newSnake.unshift(head);
-
-      // Check for food consumption before popping the tail
-      const foodIndex = state.foods.findIndex(
-        (food) => food.position.x === head.x && food.position.y === head.y
-      );
-
-      if (foodIndex === -1) {
-        newSnake.pop();
-      }
-
-      return { ...state, snake: newSnake };
-    }
-    
-    case 'SPAWN_FOOD':
-      // Don't spawn food if game hasn't started or is over
-      if (!state.isGameStarted || state.isGameOver || state.countdownValue > 0) {
-        return state;
-      }
-      
-      if (state.foods.length < GAME_CONFIG.MAX_FOODS_ON_SCREEN) {
-        // Avoid spawning food on snake
-        const avoidPositions = [...state.snake, ...state.foods.map(f => f.position)];
-        const newPosition = getRandomPosition(GAME_CONFIG.GRID_SIZE, GAME_CONFIG.GRID_SIZE, avoidPositions);
-        
-        const newFood: Food = {
-          position: newPosition,
-          letter: getRandomLetter(),
-          spawnTime: Date.now(),
-        };
-        return { ...state, foods: [...state.foods, newFood] };
-      }
-      return state;
-      
-    case 'CONSUME_FOOD': {
-      const food = action.payload;
-      const newFoods = state.foods.filter(f => f !== food);
-      const newCollectedLetters = [...state.collectedLetters, food.letter];
-      return { ...state, foods: newFoods, collectedLetters: newCollectedLetters };
-    }
-    
-    case 'VALIDATE_WORD': {
-      // Handle both string and object payload formats
-      let word: string;
-      let startIndex = 0;
-      let endIndex: number;
-      
-      if (typeof action.payload === 'string') {
-        // Old format: just the word
-        word = action.payload;
-        endIndex = state.collectedLetters.length - 1;
-      } else {
-        // New format: object with word and indices
-        word = action.payload.word;
-        startIndex = action.payload.startIndex;
-        endIndex = action.payload.endIndex;
-      }
-      
-      const newScore = state.score + word.length;
-      const newWordsCollected = state.wordsCollected + 1;
-      
-      // Create a new snake without the segments that formed the word
-      let newSnake = [...state.snake];
-      const segmentsToRemove = endIndex - startIndex + 1;
-      
-      // Remove segments from the snake
-      // For words at the beginning of the snake, we keep the head and remove from the end
-      // For words in the middle or end, we remove the specific segments
-      if (startIndex === 0) {
-        // Word at the beginning - remove from end as before
-        newSnake = newSnake.slice(0, newSnake.length - segmentsToRemove);
-      } else {
-        // Word in the middle or end - remove specific segments
-        // We need to keep the segments before startIndex and after endIndex
-        // +1 to account for the head which isn't part of collectedLetters
-        const actualStartIndex = startIndex + 1;
-        const actualEndIndex = endIndex + 1;
-        newSnake = [
-          ...newSnake.slice(0, actualStartIndex),
-          ...newSnake.slice(actualEndIndex + 1)
-        ];
-      }
-      
-      // Update collected letters - remove the ones that formed the word
-      let newCollectedLetters = [...state.collectedLetters];
-      newCollectedLetters.splice(startIndex, segmentsToRemove);
-      
-      return { 
-        ...state, 
-        score: newScore, 
-        wordsCollected: newWordsCollected,
-        collectedLetters: newCollectedLetters, 
-        snake: newSnake,
-        lastWordFormed: word
-      };
-    }
-    
-    case 'GAME_OVER':
-      return { ...state, isGameOver: true };
-      
-    case 'UPDATE_TIME':
-      return { ...state, gameTime: state.gameTime + action.payload };
-    
-    case 'RESET_GAME':
-      return {
-        ...initialState,
-        isGameStarted: true,  // Start the game immediately
-        countdownValue: 3     // Start with countdown
-      };
-      
-    default:
-      return state;
-  }
-}
-
 const GameBoard: React.FC = () => {
-  const [state, dispatch] = useReducer(gameReducer, initialState);
-  const direction = useInput();
+  // Game state management
+  const [state, dispatch] = useReducer(gameReducer, initialGameState);
+  const [countdownValue, setCountdownValue] = useState(3);
+  const [showRules, setShowRules] = useState(true);
+  
+  // Refs
+  const gameAreaRef = useRef<HTMLDivElement>(null);
   const wordValidator = useWordValidator();
-
-  // Start game and countdown
+  
+  // Initialize audio system
   useEffect(() => {
-    // Start countdown when any key is pressed
-    const handleKeyPress = () => {
-      if (!state.isGameStarted && !state.isGameOver) {
-        dispatch({ type: 'START_GAME' });
-        
-        // Start countdown
-        let count = 3;
-        const countdownInterval = setInterval(() => {
-          count -= 1;
-          dispatch({ type: 'UPDATE_COUNTDOWN', payload: count });
-          
-          if (count <= 0) {
-            clearInterval(countdownInterval);
-          }
-        }, 1000);
+    initAudio();
+  }, []);
+
+  // Handle keyboard input for snake movement
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (state.gameOver) return;
+
+      // Handle pause with Escape key
+      if (e.key === 'Escape') {
+        dispatch({ type: 'TOGGLE_PAUSE' });
+        return;
+      }
+
+      // Don't process direction keys if paused or countdown active
+      if (state.isPaused || state.countdownActive) return;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.UP });
+          break;
+        case 'ArrowDown':
+          dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.DOWN });
+          break;
+        case 'ArrowLeft':
+          dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.LEFT });
+          break;
+        case 'ArrowRight':
+          dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.RIGHT });
+          break;
       }
     };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.isPaused, state.countdownActive, state.gameOver]);
+
+  // Generate food at regular intervals
+  // Food spawn timer
+  useEffect(() => {
+    // Don't spawn food if game is paused, countdown is active, or game is over
+    if (state.isPaused || state.countdownActive || state.gameOver || !state.isGameStarted) return;
     
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [state.isGameStarted, state.isGameOver]);
-
-  // Set direction based on input
-  useEffect(() => {
-    if (direction !== null) {
-      dispatch({ type: 'SET_DIRECTION', payload: direction });
-    }
-  }, [direction]);
-
-  // Create particle effect when a word is formed
-  useEffect(() => {
-    if (state.lastWordFormed) {
-      const head = state.snake[0];
-      const x = (head.x + 1) * GAME_CONFIG.CELL_SIZE;
-      const y = (head.y + 1) * GAME_CONFIG.CELL_SIZE;
-      
-      // Create particles at the head position with the valid word color
-      createParticles(x, y, COLORS.VALID_WORD, state.lastWordFormed.length * 2);
-      
-      // Show word formed notification
-      const wordElement = document.createElement('div');
-      wordElement.className = 'word-formed';
-      wordElement.textContent = state.lastWordFormed.toUpperCase();
-      wordElement.style.left = `${x}px`;
-      wordElement.style.top = `${y - 20}px`;
-      
-      const gameBoard = document.querySelector('.game-board');
-      if (gameBoard) {
-        gameBoard.appendChild(wordElement);
-        
-        // Remove word notification after animation
-        setTimeout(() => {
-          if (gameBoard.contains(wordElement)) {
-            gameBoard.removeChild(wordElement);
-          }
-        }, 1500);
-      }
-    }
-  }, [state.lastWordFormed]);
-
-  // Game loop
-  const gameLoop = useCallback(() => {
-    if (state.isGameOver || !state.isGameStarted || state.countdownValue > 0) return;
-
-    dispatch({ type: 'MOVE_SNAKE' });
-
-    // Check for collisions with walls
-    const head = state.snake[0];
-    if (
-      head.x < 0 ||
-      head.x >= GAME_CONFIG.GRID_SIZE ||
-      head.y < 0 ||
-      head.y >= GAME_CONFIG.GRID_SIZE
-    ) {
-      dispatch({ type: 'GAME_OVER' });
-      return;
-    }
-
-    // Check for collisions with self
-    for (let i = 1; i < state.snake.length; i++) {
-      if (state.snake[i].x === head.x && state.snake[i].y === head.y) {
-        dispatch({ type: 'GAME_OVER' });
-        return;
-      }
-    }
-
-    // Check for food consumption
-    const foodIndex = state.foods.findIndex(
-      (food) => food.position.x === head.x && food.position.y === head.y
-    );
-
-    if (foodIndex !== -1) {
-      const food = state.foods[foodIndex];
-      dispatch({ type: 'CONSUME_FOOD', payload: food });
-    }
-
-    // Check if snake is too long
-    if (state.snake.length > GAME_CONFIG.MAX_SNAKE_LETTERS) {
-      dispatch({ type: 'GAME_OVER' });
-      return;
-    }
-
-    // Check if we have valid words anywhere in the snake
-    if (state.collectedLetters.length >= 3) {
-      // First check the entire string as before
-      const fullWord = state.collectedLetters.join('').toLowerCase();
-      if (wordValidator && wordValidator.isValidWord(fullWord)) {
-        dispatch({ type: 'VALIDATE_WORD', payload: fullWord });
-        return;
-      }
-      
-      // Then check for valid words of at least 3 letters anywhere in the string
-      for (let startIdx = 0; startIdx < state.collectedLetters.length - 2; startIdx++) {
-        for (let endIdx = startIdx + 2; endIdx < state.collectedLetters.length; endIdx++) {
-          const subWord = state.collectedLetters.slice(startIdx, endIdx + 1).join('').toLowerCase();
-          if (wordValidator && wordValidator.isValidWord(subWord)) {
-            dispatch({ type: 'VALIDATE_WORD', payload: { word: subWord, startIndex: startIdx, endIndex: endIdx } });
-            return;
-          }
-        }
-      }
-    }
-  }, [state, wordValidator]);
-
-  // Run game loop on interval with configured snake speed
-  useGameLoop(gameLoop, GAME_CONFIG.SNAKE_SPEED, 0);
-
-  // Spawn food on interval
-  useEffect(() => {
-    if (state.isGameOver || !state.isGameStarted || state.countdownValue > 0) return;
+    console.log('Food spawn timer started');
     
-    // Only spawn food if we're below the maximum
-    if (state.foods.length >= GAME_CONFIG.MAX_FOODS_ON_SCREEN) return;
-
+    // Create a food spawn timer that runs every 5 seconds
     const foodInterval = setInterval(() => {
-      // Double-check we're still below the max before dispatching
+      console.log('Food spawn interval triggered, current foods:', state.foods.length);
+      
+      // Only spawn food if we haven't reached the maximum
       if (state.foods.length < GAME_CONFIG.MAX_FOODS_ON_SCREEN) {
-        dispatch({ type: 'SPAWN_FOOD' });
+        console.log('Spawning new food');
+        
+        // Get all occupied positions to prevent spawning on snake
+        const occupiedPositions = [
+          ...state.snake.map(segment => ({ x: segment.x, y: segment.y })),
+          ...state.foods.map(food => food.position)
+        ];
+        
+        // Add buffer positions around snake to prevent immediate collisions
+        const bufferPositions: {x: number, y: number}[] = [];
+        state.snake.forEach(segment => {
+          // Add positions adjacent to snake segments
+          bufferPositions.push(
+            { x: segment.x + 1, y: segment.y },
+            { x: segment.x - 1, y: segment.y },
+            { x: segment.x, y: segment.y + 1 },
+            { x: segment.x, y: segment.y - 1 }
+          );
+        });
+        
+        const allOccupied = [...occupiedPositions, ...bufferPositions];
+        
+        const newPosition = getRandomPosition(
+          GAME_CONFIG.GRID_SIZE,
+          GAME_CONFIG.GRID_SIZE,
+          allOccupied
+        );
+        
+        // Check current vowel ratio to enforce at least 1 vowel per 4 letters
+        const currentFoods = state.foods.map(food => food.letter);
+        const allLetters = [...currentFoods, ...state.collectedLetters];
+        const vowelCount = allLetters.filter(letter => /[aeiou]/i.test(letter)).length;
+        const totalCount = allLetters.length;
+        
+        // Force a vowel if we don't have enough vowels (at least 1 per 4 letters)
+        const forceVowel = totalCount >= 3 && vowelCount < Math.ceil(totalCount / 4);
+        
+        // Get random letter with vowel enforcement if needed
+        const letter = forceVowel ? 
+          ['A', 'E', 'I', 'O', 'U'][Math.floor(Math.random() * 5)] : 
+          getRandomLetter();
+        
+        console.log(`Adding food: ${letter} (${forceVowel ? 'forced vowel' : 'random'}) - Current ratio: ${vowelCount}/${totalCount}`);
+        
+        dispatch({
+          type: 'ADD_FOOD',
+          payload: { position: newPosition, letter }
+        });
       }
     }, GAME_CONFIG.FOOD_SPAWN_INTERVAL);
 
     return () => clearInterval(foodInterval);
-  }, [state.isGameOver, state.isGameStarted, state.countdownValue, state.foods.length]);
+  }, [state.isPaused, state.countdownActive, state.gameOver, state.isGameStarted]);
 
   // Update game time
   useEffect(() => {
-    if (state.isGameOver || !state.isGameStarted || state.countdownValue > 0) return;
+    if (state.isPaused || !state.isGameStarted || state.gameOver || state.countdownActive) return;
 
     const timeInterval = setInterval(() => {
-      dispatch({ type: 'UPDATE_TIME', payload: 1 });
+      dispatch({ type: 'UPDATE_TIME' });
     }, 1000);
 
     return () => clearInterval(timeInterval);
-  }, [state.isGameOver, state.isGameStarted, state.countdownValue]);
+  }, [state.isPaused, state.isGameStarted, state.gameOver, state.countdownActive]);
 
-  // Get CSS classes for different game states
-  const getGameBoardClass = () => {
-    let classes = 'game-board';
-    if (state.isGameOver) classes += ' game-over';
-    if (!state.isGameStarted) classes += ' not-started';
-    return classes;
+  // Countdown timer
+  useEffect(() => {
+    if (!state.countdownActive) return;
+
+    let countdownTimer: NodeJS.Timeout;
+    
+    if (countdownValue > 0) {
+      countdownTimer = setTimeout(() => {
+        setCountdownValue(prev => prev - 1);
+      }, 1000);
+    } else {
+      // Immediately start the game when countdown reaches 0
+      dispatch({ type: 'START_GAME' });
+      dispatch({ type: 'SET_COUNTDOWN', payload: false }); // Turn off countdown
+      setCountdownValue(3); // Reset for next time
+    }
+
+    return () => {
+      if (countdownTimer) clearTimeout(countdownTimer);
+    };
+  }, [countdownValue, state.countdownActive]);
+
+  // Check for game over condition (snake too long)
+  useEffect(() => {
+    if (state.snake.length > GAME_CONFIG.MAX_SNAKE_LETTERS && !state.gameOver) {
+      dispatch({ type: 'END_GAME' });
+    }
+  }, [state.snake.length, state.gameOver]);
+
+  // Word validation - check for valid words starting from any position in the snake
+  useEffect(() => {
+    // Skip if wordValidator isn't loaded or we don't have enough letters
+    if (!wordValidator || state.collectedLetters.length < 3) {
+      return;
+    }
+
+    // Check all possible substrings of the collected letters for valid words
+    const letters = state.collectedLetters;
+    console.log('Checking for valid words in collected letters:', letters.join(''));
+    
+    // Start from the head of the snake (most recent letters first)
+    // This ensures we check words as they're formed from the head
+    for (let length = 3; length <= letters.length; length++) {
+      // Get the most recent 'length' letters (from the head of the snake)
+      const subLetters = letters.slice(0, length);
+      const word = subLetters.join('').toUpperCase();
+      
+      // Check if this substring forms a valid word
+      if (wordValidator.isValidWord(word)) {
+        console.log('Valid word found at head:', word);
+        
+        // Create indices array for the word segments (from head)
+        const indices = Array.from({ length: subLetters.length }, (_, i) => i);
+        
+        // Create particles for visual effect
+        if (gameAreaRef.current) {
+          const snakeElements = gameAreaRef.current.querySelectorAll('.snake-segment');
+          const wordSegments = Array.from(snakeElements).slice(0, length);
+          
+          wordSegments.forEach(segment => {
+            const rect = segment.getBoundingClientRect();
+            createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 'success');
+          });
+        }
+        
+        // Process the word
+        dispatch({
+          type: 'PROCESS_WORD',
+          payload: { word, indices }
+        });
+        
+        // Exit after finding the first valid word
+        return;
+      }
+    }
+    
+    // If no word found from the head, check for words anywhere in the snake
+    for (let startIdx = 1; startIdx < letters.length - 2; startIdx++) {
+      for (let endIdx = letters.length; endIdx > startIdx + 2; endIdx--) {
+        // Extract the substring
+        const subLetters = letters.slice(startIdx, endIdx);
+        const word = subLetters.join('').toUpperCase();
+        
+        // Check if this substring forms a valid word
+        if (wordValidator.isValidWord(word)) {
+          console.log('Valid word found in middle:', word);
+          
+          // Create indices array for the word segments
+          const indices = Array.from({ length: subLetters.length }, (_, i) => i + startIdx);
+          
+          // Create particles for visual effect
+          if (gameAreaRef.current) {
+            const snakeElements = gameAreaRef.current.querySelectorAll('.snake-segment');
+            const wordSegments = Array.from(snakeElements).slice(startIdx, startIdx + subLetters.length);
+            
+            wordSegments.forEach(segment => {
+              const rect = segment.getBoundingClientRect();
+              createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 'success');
+            });
+          }
+          
+          // Process the word
+          dispatch({
+            type: 'PROCESS_WORD',
+            payload: { word, indices }
+          });
+          
+          // Exit after finding the first valid word
+          return;
+        }
+      }
+    }
+  }, [state.collectedLetters, wordValidator]);
+
+  // Game loop for snake movement
+  const moveSnake = useCallback(() => {
+    dispatch({ type: 'MOVE_SNAKE' });
+  }, []);
+
+  useGameLoop(
+    moveSnake,
+    GAME_CONFIG.SNAKE_SPEED,
+    GAME_CONFIG.INITIAL_DELAY,
+    [state.isPaused, state.countdownActive, state.gameOver]
+  );
+
+  // Handle pause/resume
+  const handlePauseResume = () => {
+    if (state.gameOver) return;
+    
+    if (state.isPaused) {
+      // If paused, start countdown and then unpause
+      setShowRules(false);
+      dispatch({ type: 'SET_COUNTDOWN', payload: true });
+    } else {
+      // If playing, pause the game and show rules
+      dispatch({ type: 'TOGGLE_PAUSE' });
+      setShowRules(true);
+    }
+  };
+
+  // Handle restart
+  const handleRestart = () => {
+    dispatch({ type: 'RESET_GAME' });
+    setShowRules(true);
+  };
+
+  // Render game grid cells
+  const renderGrid = () => {
+    const cells = [];
+    for (let y = 0; y < GAME_CONFIG.GRID_SIZE; y++) {
+      for (let x = 0; x < GAME_CONFIG.GRID_SIZE; x++) {
+        const isSnakeCell = state.snake.some(segment => segment.x === x && segment.y === y);
+        const foodItem = state.foods.find(food => food.position.x === x && food.position.y === y);
+        
+        const cellKey = `cell-${x}-${y}`;
+        const cellStyle = {
+          gridColumnStart: x + 1,
+          gridRowStart: y + 1
+        };
+        
+        if (isSnakeCell) {
+          const segmentIndex = state.snake.findIndex(segment => segment.x === x && segment.y === y);
+          const isHead = segmentIndex === 0;
+          const letter = state.collectedLetters[segmentIndex] || '';
+          
+          cells.push(
+            <div
+              key={cellKey}
+              className={`snake-segment ${isHead ? 'snake-head' : ''}`}
+              style={cellStyle}
+            >
+              {letter}
+            </div>
+          );
+        } else if (foodItem) {
+          const isVowel = /[aeiou]/i.test(foodItem.letter);
+          
+          // Create a container div with grid positioning for collision detection
+          // and a child div for the food bubble with absolute positioning
+          const containerStyle = {
+            ...cellStyle, // Keep the grid positioning for collision detection
+            position: 'relative' as const, // Needed for absolute positioning of child
+          };
+          
+          cells.push(
+            <div
+              key={cellKey}
+              style={containerStyle}
+            >
+              <div
+                className={`food ${isVowel ? 'vowel' : ''}`}
+              >
+                {foodItem.letter}
+              </div>
+            </div>
+          );
+        }
+      }
+    }
+    return cells;
+  };
+
+  // Render game controls for mobile
+  const renderControls = () => {
+    return (
+      <div className="controls in-game">
+        <button 
+          className="control-btn up" 
+          onClick={() => dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.UP })}
+        >
+          <span style={{ fontSize: '1.2em' }}>▲</span>
+        </button>
+        <div className="horizontal-controls">
+          <button 
+            className="control-btn left" 
+            onClick={() => dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.LEFT })}
+          >
+            <span style={{ fontSize: '1.2em' }}>◄</span>
+          </button>
+          <button 
+            className="control-btn right" 
+            onClick={() => dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.RIGHT })}
+          >
+            <span style={{ fontSize: '1.2em' }}>►</span>
+          </button>
+        </div>
+        <button 
+          className="control-btn down" 
+          onClick={() => dispatch({ type: 'CHANGE_DIRECTION', payload: Direction.DOWN })}
+        >
+          <span style={{ fontSize: '1.2em' }}>▼</span>
+        </button>
+      </div>
+    );
   };
 
   return (
     <div className="game-container">
-      {!state.isGameStarted && !state.isGameOver && (
-        <div className="start-message">Press any key to start</div>
+      {/* Game title - only show when not in rules or countdown */}
+      {!showRules && !state.countdownActive && (
+        <h1 className="game-title">WordSnake</h1>
       )}
-      
-      {state.countdownValue > 0 && state.isGameStarted && (
-        <div className="countdown">{state.countdownValue}</div>
-      )}
-      
-      <div
-        className={getGameBoardClass()}
+
+      <div 
+        className="game-area"
+        ref={gameAreaRef}
         style={{
-          gridTemplateColumns: `repeat(${GAME_CONFIG.GRID_SIZE}, ${GAME_CONFIG.CELL_SIZE}px)`,
-          gridTemplateRows: `repeat(${GAME_CONFIG.GRID_SIZE}, ${GAME_CONFIG.CELL_SIZE}px)`,
+          gridTemplateColumns: `repeat(${GAME_CONFIG.GRID_SIZE}, 1fr)`,
+          gridTemplateRows: `repeat(${GAME_CONFIG.GRID_SIZE}, 1fr)`
         }}
       >
-        {/* Render snake */}
-        {state.snake.map((segment, index) => {
-          const isHead = index === 0;
-          const hasFoodLetter = index < state.collectedLetters.length;
-          const segmentClass = `snake-segment ${isHead ? 'snake-head' : ''} ${hasFoodLetter ? 'has-letter' : ''}`;
-          
-          return (
-            <div
-              key={`snake-${index}`}
-              className={segmentClass}
-              style={{
-                gridColumn: segment.x + 1,
-                gridRow: segment.y + 1,
-                backgroundColor: isHead ? COLORS.SNAKE_HEAD : COLORS.PRIMARY_SNAKE,
-              }}
-            >
-              {hasFoodLetter ? state.collectedLetters[index] : ''}
-            </div>
-          );
-        })}
-
-        {/* Render food */}
-        {state.foods.map((food, index) => {
-          const isVowel = 'AEIOU'.includes(food.letter);
-          return (
-            <div
-              key={`food-${index}`}
-              className={`food ${isVowel ? 'vowel' : 'consonant'}`}
-              style={{
-                gridColumn: food.position.x + 1,
-                gridRow: food.position.y + 1,
-              }}
-            >
-              {food.letter}
-            </div>
-          );
-        })}
+        {/* Pause button inside game area */}
+        {!showRules && !state.countdownActive && !state.gameOver && (
+          <button 
+            className="pause-button in-game"
+            onClick={handlePauseResume}
+          >
+            {state.isPaused ? '▶' : '⏸'}
+          </button>
+        )}
+        {renderGrid()}
         
-        {/* Particles are now rendered directly via DOM manipulation */}
-      </div>
+        {/* Overlay for rules */}
+        {showRules && (
+          <div className="rules-overlay">
+            <h2>WordSnake Rules</h2>
+            <ul>
+              <li>Use arrow keys to move the snake</li>
+              <li>Collect letters to form words</li>
+              <li>Valid words will disappear from the snake</li>
+              <li>Game ends if snake exceeds {GAME_CONFIG.MAX_SNAKE_LETTERS} letters</li>
+              <li>Try to collect as many words as possible!</li>
+            </ul>
+            <button onClick={handlePauseResume}>
+              {state.isGameStarted ? 'Resume' : 'Start'}
+            </button>
+          </div>
+        )}
+        
+        {/* Countdown overlay */}
+        {state.countdownActive && (
+          <div className="countdown-overlay">
+            <div className="countdown">{countdownValue}</div>
+          </div>
+        )}
+        
+        {/* Game over overlay */}
+        {state.gameOver && (
+          <div className="gameover-overlay">
+            <div className="gameover-content">
+              <h2>Game Over!</h2>
+              <div className="final-score">
+                <p>Score: {state.score}</p>
+                <p>Words Collected: {state.wordsCollected}</p>
+                <p>Letters Collected: {state.lettersCollected}</p>
+                <p>Time Survived: {state.gameTime}s</p>
+              </div>
+              <button onClick={handleRestart} className="play-again-button">Play Again</button>
+            </div>
+          </div>
+        )}
 
-      <ScoreDisplay 
-        score={state.score} 
-        time={state.gameTime} 
-        wordsCollected={state.wordsCollected} 
-      />
+        {/* Touch controls for mobile */}
+        {!state.isPaused && !state.countdownActive && !state.gameOver && renderControls()}
+      </div>
       
-      {state.isGameOver && (
-        <div className="game-over-message">
-          Game Over! Your snake got too long.
-          <div className="final-score">
-            Final Score: {state.score} points<br />
-            Words Collected: {state.wordsCollected}<br />
-            Time Survived: {state.gameTime} seconds
+      {/* Score bar at bottom - only show during active gameplay */}
+      {!showRules && !state.countdownActive && !state.gameOver && (
+        <div className="game-info">
+          <div className="score-bar">
+            <div className="score-metric">
+              <span className="metric-label">Score</span>
+              <span className="metric-value">{state.score}</span>
+            </div>
+            <div className="score-metric">
+              <span className="metric-label">Words</span>
+              <span className="metric-value">{state.wordsCollected}</span>
+            </div>
+            <div className="score-metric">
+              <span className="metric-label">Letters</span>
+              <span className="metric-value">{state.lettersCollected}</span>
+            </div>
+            <div className="score-metric">
+              <span className="metric-label">Time</span>
+              <span className="metric-value">{state.gameTime}s</span>
+            </div>
           </div>
         </div>
       )}
-      
-      <ControlPanel isGameOver={state.isGameOver} onRestart={() => dispatch({ type: 'RESET_GAME' })} />
     </div>
   );
 };

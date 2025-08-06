@@ -1,6 +1,7 @@
 // Using JSX syntax which implicitly uses React
 import './App.css';
 import './styles/GameStyles.css';
+// Import the GameBoard component
 import GameBoard from './components/GameBoard/GameBoard';
 
 function App() {

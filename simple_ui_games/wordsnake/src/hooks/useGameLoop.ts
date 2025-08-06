@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react';
 export function useGameLoop(
   callback: () => void,
   speed: number = 0,
-  initialDelay: number = 0
+  initialDelay: number = 0,
+  dependencies: any[] = []
 ) {
   const callbackRef = useRef(callback);
 
@@ -36,5 +37,6 @@ export function useGameLoop(
       clearTimeout(initialTimeoutId);
       clearTimeout(timeoutId);
     };
-  }, [speed, initialDelay]);
+  // Include both the original dependencies and any additional ones
+  }, [speed, initialDelay, ...dependencies]);
 }

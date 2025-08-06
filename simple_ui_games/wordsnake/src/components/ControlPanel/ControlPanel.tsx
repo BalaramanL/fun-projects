@@ -2,14 +2,14 @@
 import React from 'react';
 import '../../styles/GameStyles.css';
 
-// No need to import Direction as it's not used in this component
-
 interface ControlPanelProps {
   isGameOver: boolean;
+  isPaused?: boolean;
   onRestart: () => void;
+  onPause?: () => void;
 }
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ isGameOver, onRestart }) => {
+const ControlPanel: React.FC<ControlPanelProps> = ({ isGameOver, onRestart, onPause }) => {
   return (
     <div className="control-panel">
       {isGameOver ? (
@@ -19,6 +19,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ isGameOver, onRestart }) =>
           <p>Use arrow keys or WASD to move</p>
           <p>Collect letters to form words</p>
           <p>Valid words will disappear from your snake</p>
+          {onPause && <p>Press P or ESC to pause</p>}
         </div>
       )}
     </div>
