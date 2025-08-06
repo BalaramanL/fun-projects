@@ -60,3 +60,6 @@ public/database.json
 
 # TypeScript
 *.tsbuildinfo
+
+# Explicitly allow the favicon
+!public/android-chrome-512x512.png
