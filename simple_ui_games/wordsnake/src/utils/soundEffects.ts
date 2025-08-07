@@ -4,7 +4,7 @@
 let audioContext: AudioContext | null = null;
 
 // Sound types
-export type SoundType = 'eat' | 'turn' | 'wordFormed' | 'gameOver';
+export type SoundType = 'eat' | 'turn' | 'wordFormed' | 'gameOver' | 'warning';
 
 // Initialize audio context on first user interaction
 const getAudioContext = (): AudioContext => {
@@ -100,6 +100,33 @@ const generateGameOverSound = (context: AudioContext): void => {
   });
 };
 
+// Generate warning sound for idle timer (alternating high beeps)
+const generateWarningSound = (context: AudioContext): void => {
+  const beepCount = 3;
+  const beepDuration = 0.1;
+  const pauseDuration = 0.1;
+  const totalDuration = beepCount * (beepDuration + pauseDuration);
+  
+  for (let i = 0; i < beepCount; i++) {
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+    
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(880, context.currentTime + i * (beepDuration + pauseDuration));
+    
+    gainNode.gain.setValueAtTime(0, context.currentTime + i * (beepDuration + pauseDuration));
+    gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + i * (beepDuration + pauseDuration) + 0.01);
+    gainNode.gain.setValueAtTime(0.3, context.currentTime + i * (beepDuration + pauseDuration) + beepDuration - 0.01);
+    gainNode.gain.linearRampToValueAtTime(0, context.currentTime + i * (beepDuration + pauseDuration) + beepDuration);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+    
+    oscillator.start(context.currentTime + i * (beepDuration + pauseDuration));
+    oscillator.stop(context.currentTime + i * (beepDuration + pauseDuration) + beepDuration);
+  }
+};
+
 // Play a sound effect
 export const playSound = (soundType: SoundType): void => {
   try {
@@ -117,6 +144,9 @@ export const playSound = (soundType: SoundType): void => {
         break;
       case 'gameOver':
         generateGameOverSound(context);
+        break;
+      case 'warning':
+        generateWarningSound(context);
         break;
       default:
         console.warn(`Unknown sound type: ${soundType}`);
