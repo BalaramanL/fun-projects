@@ -442,7 +442,9 @@ const GameBoard: React.FC = () => {
               <li>Use arrow keys to move the snake</li>
               <li>Collect letters to form words</li>
               <li>Valid words will disappear from the snake</li>
+              <li>Valid words must contain at least 3 letters</li>
               <li>Game ends if snake exceeds {GAME_CONFIG.MAX_SNAKE_LETTERS} letters</li>
+              <li>Game ends if snake is idle for more than 30 seconds</li>
               <li>Try to collect as many words as possible!</li>
             </ul>
             <button onClick={handlePauseResume}>
@@ -497,6 +499,19 @@ const GameBoard: React.FC = () => {
             <div className="score-metric">
               <span className="metric-label">Time</span>
               <span className="metric-value">{state.gameTime}s</span>
+            </div>
+            <div className="score-metric">
+              <span className="metric-label">Idle</span>
+              <span 
+                className="metric-value" 
+                style={{
+                  color: state.idleTime > 25 ? '#ff3333' : 
+                         state.idleTime > 20 ? '#ff9933' : 
+                         'inherit'
+                }}
+              >
+                {Math.floor(state.idleTime)}s
+              </span>
             </div>
           </div>
         </div>

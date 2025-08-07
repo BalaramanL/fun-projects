@@ -31,6 +31,8 @@ export interface GameState {
   countdownActive: boolean;
   gameTime: number;
   collectedLetters: string[];
+  idleTime: number; // Track idle time in seconds
+  maxIdleTime: number; // Maximum allowed idle time in seconds
 }
 
 // Define Action types
@@ -62,6 +64,8 @@ export const initialGameState: GameState = {
   countdownActive: false,
   gameTime: 0,
   collectedLetters: [],
+  idleTime: 0, // Initialize idle time to 0
+  maxIdleTime: 30, // 30 seconds maximum idle time
 };
 
 // Game reducer function
@@ -70,6 +74,16 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
     case 'MOVE_SNAKE': {
       if (state.isPaused || state.countdownActive || state.gameOver) {
         return state;
+      }
+      
+      // Check for idle timeout
+      if (state.isGameStarted && state.idleTime >= state.maxIdleTime) {
+        // Play death sound
+        playSound('gameOver');
+        return {
+          ...state,
+          gameOver: true,
+        };
       }
 
       // Update direction from nextDirection
@@ -160,6 +174,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
           foods: newFoods,
           direction: effectiveDirection,
           collectedLetters: newCollectedLetters,
+          idleTime: 0, // Reset idle timer when food is collected
         };
       }
 
@@ -274,6 +289,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         isGameStarted: true,
         isPaused: false,
         countdownActive: false,
+        idleTime: 0, // Reset idle timer when game starts
       };
     }
 
@@ -289,9 +305,18 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         return state;
       }
 
+      // Increment idle time by 1 second to match game time
+      const newIdleTime = state.idleTime + 1;
+      
+      // Play warning sound if idle time is getting close to max (25+ seconds)
+      if (newIdleTime === 25) {
+        playSound('warning');
+      }
+
       return {
         ...state,
         gameTime: state.gameTime + 1,
+        idleTime: newIdleTime,
       };
     }
 
