@@ -5,7 +5,6 @@ import { useWordValidator } from '../../hooks/useWordValidator';
 import { initAudio, playSound } from '../../utils/soundEffects';
 import { Direction, type GameState, type Food, initialGameState, gameReducer } from './gameState';
 import { useGameLoop } from '../../hooks/useGameLoop';
-import html2canvas from 'html2canvas';
 import '../../styles/GameStyles.css';
 
 const GameBoard: React.FC = () => {
@@ -486,101 +485,45 @@ const GameBoard: React.FC = () => {
                     if (gameOverContent) {
                       // Create a title for the share
                       const shareTitle = 'WordSnake Challenge';
-                      const shareText = `This is how I fared in #Wordsnake today. I collected ${state.wordsCollected} words and ${state.lettersCollected} letters in ${state.gameTime} seconds! I challenge you to beat my score. Link: https://wordsnake.netlify.app/`;
-                      const shareUrl = 'https://wordsnake.netlify.app/';
                       
-                      // Helper function for Web Share API sharing
-                      const shareWithWebShareAPI = (blob: Blob) => {
-                        if (navigator.share && navigator.canShare) {
-                          const file = new File([blob], 'wordsnake-score.png', { type: 'image/png' });
-                          
-                          // Try sharing with both file and text
-                          const shareData = {
-                            title: shareTitle,
-                            text: shareText,
-                            files: [file]
-                          };
-                          
-                          if (navigator.canShare(shareData)) {
-                            navigator.share(shareData).catch(err => {
-                              console.error('Error sharing with image:', err);
-                              // Try sharing just text if image sharing fails
-                              navigator.share({
-                                title: shareTitle,
-                                text: shareText,
-                                url: shareUrl
-                              }).catch(err => console.error('Error sharing text:', err));
-                            });
-                          } else {
-                            // If can't share with files, share just text
-                            navigator.share({
-                              title: shareTitle,
-                              text: shareText,
-                              url: shareUrl
-                            }).catch(err => console.error('Error sharing text:', err));
-                          }
-                        } else {
-                          // Fallback if Web Share API is not available
-                          fallbackShare();
-                        }
+                      // Format time from seconds to minutes and seconds
+                      const formatTime = (seconds: number) => {
+                        const minutes = Math.floor(seconds / 60);
+                        const remainingSeconds = seconds % 60;
+                        return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
                       };
                       
-                      // Fallback sharing method
-                      const fallbackShare = () => {
+                      // Create emoji header based on death reason
+                      let emojiHeader = '';
+                      if (state.deathReason === 'exploded') {
+                        emojiHeader = '🐍💥 EXPLODED! 💥🐍';
+                      } else if (state.deathReason === 'tooLong') {
+                        emojiHeader = '🐍📏 TOO LONG! 📏🐍';
+                      } else if (state.deathReason === 'hunger') {
+                        emojiHeader = '🐍💀 STARVED! 💀🐍';
+                      } else {
+                        emojiHeader = '🐍🎮 GAME OVER! 🎮🐍';
+                      }
+                      
+                      // Create the emoji scorecard text
+                      const shareText = `${emojiHeader}\n\n📝 ${state.wordsCollected} words\n🔤 ${state.lettersCollected} letters\n⏱️ ${formatTime(state.gameTime)}\n\n🎮 Play: https://wordsnake.netlify.app/\n\n#SnakeGame #WordSnake #GameOver`;
+                      
+                      // Simple sharing function
+                      const shareScore = () => {
                         if (navigator.share) {
                           navigator.share({
                             title: shareTitle,
-                            text: shareText,
-                            url: shareUrl
-                          }).catch(err => console.error('Error in fallback sharing:', err));
+                            text: shareText
+                          }).catch(err => console.error('Error sharing:', err));
                         } else {
                           navigator.clipboard.writeText(shareText)
-                            .then(() => alert('Share text copied to clipboard!'))
+                            .then(() => alert('Score copied to clipboard!'))
                             .catch(err => console.error('Error copying text:', err));
                         }
                       };
                       
-                      // For Mac Notes app and similar applications, we need a special approach
-                      html2canvas(gameOverContent, {
-                        backgroundColor: '#1e1e1e', // Match the dark background
-                        scale: 2 // Higher resolution for better quality
-                      }).then(canvas => {
-                        try {
-                          // For Mac Notes and similar apps that support clipboard operations
-                          canvas.toBlob(async (blob) => {
-                            if (blob) {
-                              try {
-                                // Try to copy both image and text to clipboard if supported
-                                if (navigator.clipboard && navigator.clipboard.write) {
-                                  const clipboardItem = new ClipboardItem({
-                                    [blob.type]: blob,
-                                    'text/plain': new Blob([shareText], { type: 'text/plain' })
-                                  });
-                                  
-                                  await navigator.clipboard.write([clipboardItem]);
-                                  alert('Image and text copied to clipboard! You can now paste in Notes or other apps.');
-                                } else {
-                                  // If clipboard API doesn't support writing both, try Web Share API
-                                  shareWithWebShareAPI(blob);
-                                }
-                              } catch (err) {
-                                console.error('Error copying to clipboard:', err);
-                                // Fallback to Web Share API
-                                shareWithWebShareAPI(blob);
-                              }
-                            } else {
-                              // Fallback if blob creation failed
-                              fallbackShare();
-                            }
-                          }, 'image/png');
-                        } catch (err) {
-                          console.error('Error in sharing process:', err);
-                          fallbackShare();
-                        }
-                      }).catch(err => {
-                        console.error('Error creating screenshot:', err);
-                        fallbackShare();
-                      });
+                      // Share the text directly
+                      shareScore();
                     }
                   }} 
                   className="share-button"
