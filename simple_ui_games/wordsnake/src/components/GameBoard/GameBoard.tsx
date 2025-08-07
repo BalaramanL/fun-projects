@@ -465,13 +465,41 @@ const GameBoard: React.FC = () => {
           <div className="gameover-overlay">
             <div className="gameover-content">
               <h2>Game Over!</h2>
+              <div className="death-reason">
+                {state.deathReason === 'exploded' && <p>Snake exploded!</p>}
+                {state.deathReason === 'tooLong' && <p>Snake grew too long!</p>}
+                {state.deathReason === 'hunger' && <p>Snake died from hunger!</p>}
+              </div>
               <div className="final-score">
-                <p>Score: {state.score}</p>
                 <p>Words Collected: {state.wordsCollected}</p>
                 <p>Letters Collected: {state.lettersCollected}</p>
                 <p>Time Survived: {state.gameTime}s</p>
               </div>
-              <button onClick={handleRestart} className="play-again-button">Play Again</button>
+              <div className="game-over-buttons">
+                <button onClick={handleRestart} className="play-again-button">Play Again</button>
+                <button 
+                  onClick={() => {
+                    // Share functionality
+                    if (navigator.share) {
+                      navigator.share({
+                        title: 'WordSnake Challenge',
+                        text: `This is how I fared with Wordsnake today. I challenge you to beat my score. I collected ${state.wordsCollected} words and ${state.lettersCollected} letters in ${state.gameTime} seconds!`,
+                        url: 'https://wordsnake.netlify.app/'
+                      })
+                      .catch(err => console.error('Error sharing:', err));
+                    } else {
+                      // Fallback for browsers that don't support Web Share API
+                      const shareText = `This is how I fared with Wordsnake today. I challenge you to beat my score. Game link: https://wordsnake.netlify.app/`;
+                      navigator.clipboard.writeText(shareText)
+                        .then(() => alert('Share text copied to clipboard!'))
+                        .catch(err => console.error('Error copying text:', err));
+                    }
+                  }} 
+                  className="share-button"
+                >
+                  Share <span><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -484,10 +512,6 @@ const GameBoard: React.FC = () => {
       {!showRules && !state.countdownActive && !state.gameOver && (
         <div className="game-info">
           <div className="score-bar">
-            <div className="score-metric">
-              <span className="metric-label">Score</span>
-              <span className="metric-value">{state.score}</span>
-            </div>
             <div className="score-metric">
               <span className="metric-label">Words</span>
               <span className="metric-value">{state.wordsCollected}</span>

@@ -22,7 +22,6 @@ export interface GameState {
   foods: Food[];
   direction: Direction;
   nextDirection: Direction;
-  score: number;
   wordsCollected: number;
   lettersCollected: number;
   gameOver: boolean;
@@ -33,6 +32,7 @@ export interface GameState {
   collectedLetters: string[];
   idleTime: number; // Track idle time in seconds
   maxIdleTime: number; // Maximum allowed idle time in seconds
+  deathReason?: 'exploded' | 'tooLong' | 'hunger'; // Reason for snake death
 }
 
 // Define Action types
@@ -55,7 +55,6 @@ export const initialGameState: GameState = {
   foods: [],
   direction: Direction.RIGHT,
   nextDirection: Direction.RIGHT,
-  score: 0,
   wordsCollected: 0,
   lettersCollected: 0,
   gameOver: false,
@@ -83,6 +82,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         return {
           ...state,
           gameOver: true,
+          deathReason: 'hunger',
         };
       }
 
@@ -121,7 +121,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
           newHead = { ...head };
       }
 
-      // Check for wall collision
+      // Check for collision with walls
       if (
         newHead.x < 0 ||
         newHead.x >= GAME_CONFIG.GRID_SIZE ||
@@ -133,19 +133,19 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         return {
           ...state,
           gameOver: true,
+          deathReason: 'exploded',
         };
       }
 
-      // Check for self collision (skip head)
-      for (let i = 1; i < state.snake.length; i++) {
-        if (state.snake[i].x === newHead.x && state.snake[i].y === newHead.y) {
-          // Play death sound
-          playSound('gameOver');
-          return {
-            ...state,
-            gameOver: true,
-          };
-        }
+      // Check for collision with self
+      if (state.snake.some(segment => segment.x === newHead.x && segment.y === newHead.y)) {
+        // Play death sound
+        playSound('gameOver');
+        return {
+          ...state,
+          gameOver: true,
+          deathReason: 'exploded',
+        };
       }
 
       // Check for food collision
@@ -235,8 +235,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       // Extract word and indices from payload
       const { word, indices } = action.payload;
       
-      // Calculate score based on word length (longer words = more points)
-      const wordScore = Math.pow(2, word.length - 2) * 10;
+      // No longer calculating score as it's been removed
       
       // Play word formed sound
       playSound('wordFormed');
@@ -265,7 +264,6 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       return {
         ...state,
         snake: newSnake,
-        score: state.score + wordScore,
         wordsCollected: state.wordsCollected + 1,
         lettersCollected: state.lettersCollected + word.length,
         collectedLetters: newCollectedLetters,
@@ -302,6 +300,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       return {
         ...state,
         gameOver: true,
+        deathReason: 'tooLong',
       };
     }
 

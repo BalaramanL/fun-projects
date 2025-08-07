@@ -399,22 +399,42 @@
   text-align: center;
   padding: 0;
   font-size: 1.2rem;
-  overflow: hidden;
+  overflow: auto; /* Changed from hidden to auto to enable scrolling */
   backdrop-filter: blur(3px);
 }
 
 .gameover-content {
   background-color: var(--card-bg);
   padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 0 20px rgba(155, 89, 182, 0.7);
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
   max-width: 90%;
   width: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin: auto; /* Center vertically when scrolling */
+  overflow-y: auto; /* Enable vertical scrolling if needed */
+  max-height: 90vh; /* Limit height on small screens */
   justify-content: center;
   border: 2px solid var(--header-color);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 480px) {
+  .gameover-content {
+    padding: 20px;
+    width: 85%;
+  }
+  
+  .play-again-button,
+  .share-button {
+    padding: 10px 16px;
+    width: 100px;
+    height: 42px;
+    margin: 5px;
+    box-sizing: border-box;
+  }
 }
 
 .gameover-content h2 {
@@ -556,6 +576,11 @@
   background-color: rgba(155, 89, 182, 0.5); /* More transparent */
   backdrop-filter: blur(1px);
   pointer-events: auto;
+  -webkit-appearance: none; /* Remove default styling on iOS */
+  appearance: none; /* Remove default styling */
+  border: none; /* Remove border */
+  outline: none; /* Remove outline */
+  box-shadow: none; /* Remove box shadow */
 }
 
 .pause-button:hover {
@@ -861,19 +886,77 @@
 
 /* Play again button */
 .play-again-button {
-  background-color: var(--accent);
+  background-color: #9b59b6;
   color: white;
   border: none;
-  border-radius: 8px;
   padding: 12px 24px;
-  font-size: 1.2rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
   cursor: pointer;
-  margin-top: 20px;
   transition: all 0.2s ease;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  width: 120px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  line-height: 1;
 }
 
 .play-again-button:hover {
   transform: scale(1.05);
   box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+.death-reason {
+  margin: 10px 0 20px;
+  font-size: 1.4rem;
+  color: var(--food-letter);
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.game-over-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center; /* Ensure vertical alignment */
+  gap: 15px;
+  margin-top: 20px;
+  flex-wrap: wrap; /* Allow buttons to wrap on small screens */
+}
+
+.share-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 120px;
+  height: 48px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  margin: 0;
+  line-height: 1;
+}
+
+.share-button:hover {
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.share-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
