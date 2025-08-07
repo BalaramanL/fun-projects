@@ -280,16 +280,21 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       return {
         ...state,
         isPaused: !state.isPaused,
+        // No changes to idleTime - preserve the current value
       };
     }
 
     case 'START_GAME': {
+      // Check if this is a game resume (already started) or a new game start
+      const isResuming = state.isGameStarted;
+      
       return {
         ...state,
         isGameStarted: true,
         isPaused: false,
         countdownActive: false,
-        idleTime: 0, // Reset idle timer when game starts
+        // Only reset idle timer for new games, preserve it when resuming
+        idleTime: isResuming ? state.idleTime : 0,
       };
     }
 
